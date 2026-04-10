@@ -13,27 +13,24 @@ IconKit is a Swift library and CLI tool (Swift Package) for working with Apple's
 ## Build & Test Commands
 
 ```bash
-# Build the library and CLI
-swift build
-
-# Build release
-swift build -c release
-
-# Run tests
-swift test
-
-# Run a single test
-swift test --filter <TestClassName>/<testMethodName>
-
-# Run the CLI during development
-swift run iconkit <subcommand> [options]
+swift build                  # Build library and CLI
+swift build -c release       # Release build
+swift test                   # Run all tests
+swift test --filter IconKitTests/testName  # Run a single test
+swift run iconkit <subcommand> [options]   # Run CLI during development
 ```
 
 ## Architecture
 
-This is a Swift Package with two targets:
+Swift Package with two products and three targets:
 
-- **IconKit** — the core library containing icon generation, manipulation, and `.icon` bundle I/O logic
-- **iconkit** (lowercase) — the CLI executable that exposes the library's capabilities as command-line subcommands
+| Product | Target | Type | Description |
+|---------|--------|------|-------------|
+| `IconKit` | `IconKit` | Library | Core library — icon generation, manipulation, `.icon` bundle I/O |
+| `iconkit` | `IconKitCLI` | Executable | CLI tool built with swift-argument-parser |
 
-The `.icon` bundle is Apple's structured icon format that contains multiple image layers (front, middle, back) at various sizes, enabling dynamic rendering effects like parallax and lighting.
+- **Repo/package**: `icon-kit` / `IconKit`
+- **SPM dependency usage**: `.product(name: "IconKit", package: "icon-kit")`
+- The CLI product name (`iconkit`) differs from its target name (`IconKitCLI`) to avoid case-only collision with the library target on case-insensitive filesystems.
+
+The `.icon` bundle is Apple's structured icon format containing multiple image layers (front, middle, back) at various sizes, enabling dynamic rendering effects like parallax and lighting.
