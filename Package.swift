@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "IconKit",
+    platforms: [.macOS(.v13)],
     products: [
         .library(name: "IconKit", targets: ["IconKit"]),
         .executable(name: "iconkit", targets: ["IconKitCLI"]),
