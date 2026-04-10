@@ -73,7 +73,7 @@ struct IconFillTests {
         let data = try JSONEncoder().encode(fill)
         let string = String(data: data, encoding: .utf8)!
         #expect(string.contains("solid"))
-        #expect(string.contains("srgb:1.0,0.0,0.0,1.0"))
+        #expect(string.contains("srgb:1.00000,0.00000,0.00000,1.00000"))
     }
 
     @Test("Encode automatic-gradient fill")
@@ -82,7 +82,7 @@ struct IconFillTests {
         let data = try JSONEncoder().encode(fill)
         let string = String(data: data, encoding: .utf8)!
         #expect(string.contains("automatic-gradient"))
-        #expect(string.contains("display-p3:0.5,0.5,0.5,1.0"))
+        #expect(string.contains("display-p3:0.50000,0.50000,0.50000,1.00000"))
     }
 
     // MARK: - Round-trip

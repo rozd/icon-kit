@@ -47,7 +47,7 @@ struct IconDocumentTests {
                 }
             ],
             "supported-platforms": {
-                "circles": true,
+                "circles": ["watchOS"],
                 "squares": "shared"
             }
         }
@@ -111,7 +111,7 @@ struct IconDocumentTests {
                     blendMode: .overlay
                 ),
             ],
-            supportedPlatforms: SupportedPlatforms(circles: true, squares: .shared)
+            supportedPlatforms: SupportedPlatforms(circles: ["watchOS"], squares: .shared)
         )
 
         let encoder = JSONEncoder()

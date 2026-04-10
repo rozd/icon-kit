@@ -151,11 +151,5 @@ extension IconColor.ColorSpace {
 }
 
 private func formatComponent(_ value: Double) -> String {
-    // Use 5 decimal places, trimming trailing zeros but keeping at least one decimal
-    let formatted = String(format: "%.5f", value)
-    var trimmed = formatted
-    while trimmed.hasSuffix("0") && !trimmed.hasSuffix(".0") {
-        trimmed.removeLast()
-    }
-    return trimmed
+    String(format: "%.5f", value)
 }

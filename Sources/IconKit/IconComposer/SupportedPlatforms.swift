@@ -1,13 +1,13 @@
 /// Platform targeting configuration for an icon document.
 public struct SupportedPlatforms: Hashable, Sendable {
 
-    /// Whether circular icons (watchOS) are supported.
-    public var circles: Bool?
+    /// Circular icon platforms (e.g. `["watchOS"]`).
+    public var circles: [String]?
 
     /// Square icon platform configuration.
     public var squares: Squares?
 
-    public init(circles: Bool? = nil, squares: Squares? = nil) {
+    public init(circles: [String]? = nil, squares: Squares? = nil) {
         self.circles = circles
         self.squares = squares
     }
@@ -36,7 +36,7 @@ extension SupportedPlatforms: Codable {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        circles = try container.decodeIfPresent(Bool.self, forKey: .circles)
+        circles = try container.decodeIfPresent([String].self, forKey: .circles)
         squares = try container.decodeIfPresent(Squares.self, forKey: .squares)
     }
 

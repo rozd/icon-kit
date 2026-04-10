@@ -5,8 +5,8 @@
 /// can be overridden per appearance/idiom via specialization arrays.
 public struct IconGroup: Codable, Hashable, Sendable {
 
-    /// UUID string identifier for this group.
-    public var id: String
+    /// Optional identifier for this group.
+    public var id: String?
 
     /// Optional display name.
     public var name: String?
@@ -46,9 +46,10 @@ public struct IconGroup: Codable, Hashable, Sendable {
     public var opacitySpecializations: [Specialization<Double>]?
     public var specularSpecializations: [Specialization<Bool>]?
     public var blendModeSpecializations: [Specialization<IconBlendMode>]?
+    public var positionSpecializations: [Specialization<IconPosition>]?
 
     public init(
-        id: String = "",
+        id: String? = nil,
         name: String? = nil,
         layers: [IconLayer] = [],
         hidden: Bool? = nil,
@@ -64,7 +65,8 @@ public struct IconGroup: Codable, Hashable, Sendable {
         translucencySpecializations: [Specialization<IconTranslucency>]? = nil,
         opacitySpecializations: [Specialization<Double>]? = nil,
         specularSpecializations: [Specialization<Bool>]? = nil,
-        blendModeSpecializations: [Specialization<IconBlendMode>]? = nil
+        blendModeSpecializations: [Specialization<IconBlendMode>]? = nil,
+        positionSpecializations: [Specialization<IconPosition>]? = nil
     ) {
         self.id = id
         self.name = name
@@ -83,6 +85,7 @@ public struct IconGroup: Codable, Hashable, Sendable {
         self.opacitySpecializations = opacitySpecializations
         self.specularSpecializations = specularSpecializations
         self.blendModeSpecializations = blendModeSpecializations
+        self.positionSpecializations = positionSpecializations
     }
 
     enum CodingKeys: String, CodingKey {
@@ -95,5 +98,6 @@ public struct IconGroup: Codable, Hashable, Sendable {
         case opacitySpecializations = "opacity-specializations"
         case specularSpecializations = "specular-specializations"
         case blendModeSpecializations = "blend-mode-specializations"
+        case positionSpecializations = "position-specializations"
     }
 }
