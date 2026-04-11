@@ -167,7 +167,7 @@ jobs:
           echo "SHA256: ${SHA256}"
 
           # Clone the Homebrew tap repository
-          git clone "https://x-access-token:${TAP_TOKEN}@github.com/rozd/homebrew-iconkit.git" tap
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/rozd/homebrew-tap.git" tap
           cd tap
 
           # Write updated formula

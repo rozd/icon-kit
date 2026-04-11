@@ -26,7 +26,7 @@ IconKit reads and writes the `.icon` bundle format introduced with Icon Composer
 #### Homebrew
 
 ```bash
-brew tap rozd/iconkit
+brew tap rozd/tap
 brew install iconkit
 ```
 

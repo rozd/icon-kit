@@ -40,10 +40,10 @@ The `.icon` bundle is Apple's structured icon format containing multiple image l
 - **CI**: `.github/workflows/ci.yml` — builds, tests, and uploads coverage on push/PR to `main` (runs on `macos-15`)
 - **Release**: `.github/workflows/release.yml` — auto-versions via Conventional Commits on push to `main`, creates GitHub Releases, and updates the Homebrew tap formula
 - Versioning is automatic: commit messages drive semver bumps (`feat:` → minor, `fix:` → patch, breaking → major)
-- The release workflow also updates the `rozd/homebrew-iconkit` tap using the `HOMEBREW_TAP_TOKEN` secret
+- The release workflow also updates the `rozd/homebrew-tap` tap using the `HOMEBREW_TAP_TOKEN` secret
 
 ## Distribution
 
-- **Homebrew**: `brew tap rozd/iconkit && brew install iconkit` — formula lives in `rozd/homebrew-iconkit`, auto-updated by the release workflow
+- **Homebrew**: `brew tap rozd/tap && brew install iconkit` — formula lives in `rozd/homebrew-tap`, auto-updated by the release workflow
 - **SPM library**: `.product(name: "IconKit", package: "icon-kit")`
 - **Formula template**: `Formula/iconkit.rb` — reference copy of the Homebrew formula kept in this repo
