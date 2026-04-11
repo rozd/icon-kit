@@ -10,3 +10,5 @@ DerivedData/
 .claude/settings.local.json
 
 *.icon
+
+tmp/
