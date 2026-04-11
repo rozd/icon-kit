@@ -8,3 +8,5 @@ DerivedData/
 .netrc
 
 .claude/settings.local.json
+
+*.icon
