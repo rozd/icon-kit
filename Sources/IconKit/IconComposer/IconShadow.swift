@@ -3,6 +3,8 @@ public struct IconShadow: Codable, Hashable, Sendable {
 
     /// The kind of shadow to apply.
     public enum Kind: String, Codable, Hashable, Sendable {
+        /// No shadow.
+        case none
         /// A neutral gray shadow.
         case neutral
         /// A shadow colored to match the layer content.

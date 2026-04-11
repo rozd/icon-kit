@@ -56,13 +56,13 @@ struct IconColorTests {
     @Test("String representation round-trips")
     func stringRepresentation() throws {
         let color = try IconColor(parsing: "srgb:1.0,0.0,0.0,1.0")
-        #expect(color.stringRepresentation == "srgb:1.0,0.0,0.0,1.0")
+        #expect(color.stringRepresentation == "srgb:1.00000,0.00000,0.00000,1.00000")
     }
 
     @Test("String representation for gray")
     func stringRepresentationGray() throws {
         let color = try IconColor(parsing: "gray:0.5,1.0")
-        #expect(color.stringRepresentation == "gray:0.5,1.0")
+        #expect(color.stringRepresentation == "gray:0.50000,1.00000")
     }
 
     // MARK: - JSON Codable
@@ -88,7 +88,7 @@ struct IconColorTests {
         let color = IconColor(colorSpace: .sRGB, components: [1.0, 0.0, 0.0, 1.0])
         let data = try JSONEncoder().encode(color)
         let string = String(data: data, encoding: .utf8)!
-        #expect(string == #""srgb:1.0,0.0,0.0,1.0""#)
+        #expect(string == #""srgb:1.00000,0.00000,0.00000,1.00000""#)
     }
 
     // MARK: - Error cases

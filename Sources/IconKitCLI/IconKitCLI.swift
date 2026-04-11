@@ -7,6 +7,6 @@ struct IconKitCLI: ParsableCommand {
         commandName: "iconkit",
         abstract: "A tool for working with Apple .icon bundles.",
         version: IconKit.version,
-        subcommands: []
+        subcommands: [TestCommand.self, RibbonCommand.self]
     )
 }

@@ -4,8 +4,8 @@
 /// Each property can be overridden per appearance/idiom via specialization arrays.
 public struct IconLayer: Codable, Hashable, Sendable {
 
-    /// UUID string identifier for this layer.
-    public var id: String
+    /// Optional identifier for this layer.
+    public var id: String?
 
     /// Optional display name.
     public var name: String?
@@ -42,7 +42,7 @@ public struct IconLayer: Codable, Hashable, Sendable {
     public var positionSpecializations: [Specialization<IconPosition>]?
 
     public init(
-        id: String = "",
+        id: String? = nil,
         name: String? = nil,
         imageName: String? = nil,
         fill: IconFill? = nil,

@@ -50,7 +50,7 @@ struct IconComposerDescriptorFileTests {
                     ]
                 ),
             ],
-            supportedPlatforms: SupportedPlatforms(circles: true, squares: .shared)
+            supportedPlatforms: SupportedPlatforms(circles: ["watchOS"], squares: .shared)
         )
     }
 
