@@ -65,27 +65,13 @@ public struct RibbonRenderer: Sendable {
                     height: ribbonHeight
                 )
             )
-        case .topLeft:
+        case .topLeft, .topRight:
             drawDiagonalRibbon(
                 in: context,
-                canvasSize: Double(max(width, height)),
+                width: Double(width),
+                height: Double(height),
                 ribbonHeight: ribbonHeight,
-                offsetPixels: offsetPixels,
-                cornerX: 0,
-                cornerY: 0,
-                imageWidth: Double(width),
-                imageHeight: Double(height)
-            )
-        case .topRight:
-            drawDiagonalRibbon(
-                in: context,
-                canvasSize: Double(max(width, height)),
-                ribbonHeight: ribbonHeight,
-                offsetPixels: offsetPixels,
-                cornerX: Double(width),
-                cornerY: 0,
-                imageWidth: Double(width),
-                imageHeight: Double(height)
+                offsetPixels: offsetPixels
             )
         }
 
@@ -131,67 +117,59 @@ public struct RibbonRenderer: Sendable {
 
     // MARK: - Diagonal ribbon
 
-    /// Draw a diagonal corner ribbon.
+    /// Draw a diagonal corner ribbon using a transform-based approach:
     ///
-    /// The ribbon is positioned so its centerline sits at `ribbonHeight/2 + offset`
-    /// distance from the corner, perpendicular to the corner diagonal.
-    /// `cornerX/cornerY` are in **visual** coordinates (origin top-left),
-    /// converted to CG internally.
+    /// 1. Translate the context origin to the target corner (in CG coords).
+    /// 2. Rotate 45° (CW for topRight, CCW for topLeft).
+    /// 3. Position the ribbon so its top edge (pre-rotation) passes through the
+    ///    corner point (built-in offset of `ribbonHeight / 2`).
+    /// 4. Apply the user's `--offset` as additional displacement into the icon.
     private func drawDiagonalRibbon(
         in context: CGContext,
-        canvasSize: Double,
+        width: Double,
+        height: Double,
         ribbonHeight: Double,
-        offsetPixels: Double,
-        cornerX: Double,
-        cornerY: Double,
-        imageWidth: Double,
-        imageHeight: Double
+        offsetPixels: Double
     ) {
-        // The ribbon's inner edge sits at `ribbonHeight + offset` from the corner
-        // along each axis. In the 45° rotated frame, that distance from corner
-        // along the perpendicular is (ribbonHeight + offset) / sqrt(2).
-        let edgeDistance = ribbonHeight + offsetPixels
-        let distance = edgeDistance / sqrt(2.0) + ribbonHeight / 2.0
+        // Corner and rotation angle from placement (CG coords: origin bottom-left)
+        let cgCorner: CGPoint
+        let angle: Double
+        switch placement {
+        case .topRight:
+            cgCorner = CGPoint(x: width, y: height)
+            angle = -Double.pi / 4  // 45° CW
+        case .topLeft:
+            cgCorner = CGPoint(x: 0, y: height)
+            angle = Double.pi / 4   // 45° CCW
+        default:
+            return
+        }
 
-        // The ribbon length must span from one canvas edge to the other at this
-        // depth. At distance d from corner (perpendicular), the chord length is 2*d*sqrt(2).
-        let ribbonLength = 2.0 * edgeDistance + ribbonHeight
+        // Ribbon long enough to always span beyond both canvas edges.
+        let ribbonLength = (width + height) * 2.0
 
-        // Convert visual corner (origin top-left) to CG corner (origin bottom-left)
-        let cgCornerX = cornerX
-        let cgCornerY = imageHeight - cornerY
-
-        // Determine rotation angle based on which corner:
-        // topLeft  (0, h): rotate +45° so ribbon goes from left edge to top edge
-        // topRight (w, h): rotate -45° so ribbon goes from top edge to right edge
-        let isRight = cornerX > imageWidth / 2
-        let angle = isRight ? (-Double.pi / 4) : (Double.pi / 4)
-
-        // In the rotated frame, "into the icon" is the -Y direction
-        // (away from the corner toward the center)
-        let ribbonCenterY = -distance
-
-        context.saveGState()
-        context.translateBy(x: cgCornerX, y: cgCornerY)
-        context.rotate(by: angle)
+        // Perpendicular displacement in the rotated frame (-Y = into the icon):
+        //   Built-in: ribbonHeight/2 so the top edge touches the corner.
+        //   User offset: each screen-space leg = offsetPixels →
+        //     rotated-frame Y displacement = offsetPixels * √2.
+        let ribbonCenterY = -(ribbonHeight / 2.0 + offsetPixels * sqrt(2.0))
 
         let ribbonRect = CGRect(
-            x: -ribbonLength / 2,
-            y: ribbonCenterY - ribbonHeight / 2,
+            x: -ribbonLength / 2.0,
+            y: ribbonCenterY - ribbonHeight / 2.0,
             width: ribbonLength,
             height: ribbonHeight
         )
 
-        // Background
-        context.setFillColor(style.background)
-        context.fill(ribbonRect)
-
-        // Text
+        // Text sizing (same pattern as horizontal ribbon).
         let fontSize = ribbonHeight * style.fontScale
         let line = makeLine(fontSize: fontSize)
         let textBounds = CTLineGetBoundsWithOptions(line, .useOpticalBounds)
 
-        let availableWidth = ribbonLength * 0.5
+        // Visible chord length on a square canvas at this perpendicular depth ≈ 2·|centerY|.
+        let visibleChord = 2.0 * abs(ribbonCenterY)
+        let availableWidth = visibleChord * 0.8
+
         let finalLine: CTLine
         let finalBounds: CGRect
         if textBounds.width > availableWidth {
@@ -203,20 +181,22 @@ public struct RibbonRenderer: Sendable {
             finalBounds = textBounds
         }
 
-        // Center text in the visible portion of the ribbon.
-        // The visible center is offset from the corner along the ribbon.
-        // For topLeft: positive X = toward icon interior along ribbon
-        // For topRight: negative X = toward icon interior along ribbon
-        // In the rotated frame, x=0 is the corner (off-screen in the squircle).
-        // Shift text toward the visible interior of the icon.
-        let textCenterX = isRight
-            ? -(edgeDistance / 2)
-            : (edgeDistance / 2)
+        // Text centered at x=0 (symmetric on square canvas due to 45° geometry).
+        let textX = -finalBounds.width / 2.0 - finalBounds.origin.x
+        let textY = ribbonCenterY - finalBounds.height / 2.0 - finalBounds.origin.y
 
+        // Transform and draw.
+        context.saveGState()
+        context.translateBy(x: cgCorner.x, y: cgCorner.y)
+        context.rotate(by: angle)
+
+        // Background
+        context.setFillColor(style.background)
+        context.fill(ribbonRect)
+
+        // Text
         context.setFillColor(style.foreground)
         context.textMatrix = .identity
-        let textX = textCenterX - finalBounds.width / 2 - finalBounds.origin.x
-        let textY = ribbonCenterY - finalBounds.height / 2 - finalBounds.origin.y
         context.textPosition = CGPoint(x: textX, y: textY)
         CTLineDraw(finalLine, context)
 
