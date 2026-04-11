@@ -29,10 +29,10 @@ struct RibbonCommand: ParsableCommand {
     var offset: Double = 0.0
 
     @Option(name: .long, help: "Ribbon background color as hex (e.g. \"#FF0000\").")
-    var background: String = "#000000"
+    var background: String = "#B92636"
 
     @Option(name: .long, help: "Text color as hex (e.g. \"#FFFFFF\").")
-    var foreground: String = "#FFFFFF"
+    var foreground: String = "#FEFAFA"
 
     @Option(name: .long, help: "Font family name.")
     var font: String?

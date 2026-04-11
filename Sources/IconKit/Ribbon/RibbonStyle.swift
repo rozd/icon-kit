@@ -28,8 +28,8 @@ public struct RibbonStyle: Sendable {
         text: String,
         size: Double = 0.24,
         offset: Double = 0.0,
-        background: CGColor = CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1),
-        foreground: CGColor = CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1),
+        background: CGColor = CGColor(srgbRed: 0xB9 / 255.0, green: 0x26 / 255.0, blue: 0x36 / 255.0, alpha: 1),
+        foreground: CGColor = CGColor(srgbRed: 0xFE / 255.0, green: 0xFA / 255.0, blue: 0xFA / 255.0, alpha: 1),
         fontName: String? = nil,
         fontScale: Double = 0.6
     ) {
