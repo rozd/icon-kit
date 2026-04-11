@@ -3,7 +3,7 @@
 [![Swift 6.2](https://img.shields.io/badge/Swift-6.2-orange.svg)](https://swift.org)
 [![Release](https://img.shields.io/github/v/release/rozd/icon-kit)](https://github.com/rozd/icon-kit/releases)
 [![codecov](https://codecov.io/gh/rozd/icon-kit/branch/main/graph/badge.svg)](https://codecov.io/gh/rozd/icon-kit)
-[![License](https://img.shields.io/github/license/rozd/faketooth)](LICENSE)
+[![License](https://img.shields.io/github/license/rozd/icon-kit)](LICENSE)
 
 **A Swift library and CLI for working with Apple `.icon` bundles.**
 
