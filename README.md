@@ -7,12 +7,13 @@
 
 **A Swift library and CLI for working with Apple `.icon` bundles.**
 
-IconKit reads and writes the `.icon` bundle format introduced with Icon Composer — Apple's structured icon format containing multiple image layers (front, middle, back) at various sizes, enabling dynamic rendering effects like parallax and lighting. Use it to inspect bundle structure, add environment ribbons to existing icons, manipulate layers programmatically, or validate round-trip fidelity.
+IconKit reads and writes the `.icon` bundle format introduced with Icon Composer — Apple's structured icon format containing multiple image layers (front, middle, back) at various sizes, enabling dynamic rendering effects like parallax and lighting. Use it to generate icons from SF Symbols, inspect bundle structure, add environment ribbons to existing icons, manipulate layers programmatically, or validate round-trip fidelity.
 
 ---
 
 ## ✨ Features
 
+- 🔣 **SF Symbol Icons** — generate `.icon` bundles from any SF Symbol with configurable background, foreground color, size, and offset. Perfect for prototyping and internal tools.
 - 🎀 **Ribbon Overlays** — stamp UAT / QA / Staging labels onto any `.icon` bundle in one command. Configurable placement, colors, font, and size.
 - 📦 **Round-Trip Safe** — read an `.icon` bundle, inspect or modify it, write it back out without data loss.
 - 🧩 **Full Document Model** — typed Swift structs for every part of the `.icon` format: groups, layers, fills, shadows, blend modes, specializations, and platform targeting.
@@ -74,6 +75,34 @@ iconkit ribbon topLeft \
 | `--foreground` | `#FEFAFA` | Text color (hex) |
 | `--font` | System | Font family name |
 | `--font-scale` | `0.6` | Text size as a factor of ribbon height |
+
+</details>
+
+### Generate an icon from an SF Symbol
+
+Create a new `.icon` bundle from any SF Symbol:
+
+```bash
+iconkit generate sf \
+  --symbol "shippingbox.fill" \
+  --background "#4A90D9" \
+  --foreground "#FFFFFF" \
+  --size 0.8 \
+  --output AppIcon.icon
+```
+
+<details>
+<summary>Generate options</summary>
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--symbol` | — | SF Symbol name (e.g. `shippingbox.fill`) |
+| `--output` | — | Path to output `.icon` bundle |
+| `--background` | `#007AFF` | Icon background color (hex) |
+| `--foreground` | `#FFFFFF` | Symbol color (hex) |
+| `--size` | `0.6` | Symbol size as a fraction of icon space (0.0–1.0) |
+| `--offset-x` | `0.0` | Horizontal offset as a fraction of icon width |
+| `--offset-y` | `0.0` | Vertical offset as a fraction of icon height |
 
 </details>
 
@@ -170,6 +199,23 @@ let style = RibbonStyle(
 )
 
 try icon.applyRibbon(placement: .top, style: style)
+try icon.write(to: outputURL)
+```
+
+### Generate an icon from an SF Symbol
+
+```swift
+let style = SFSymbolStyle(
+    symbolName: "shippingbox.fill",
+    foreground: try parseHexColor("#FFFFFF"),
+    size: 0.8
+)
+
+let background = try parseHexIconColor("#4A90D9")
+let icon = try IconComposerDescriptorFile.sfSymbol(
+    style: style,
+    background: background
+)
 try icon.write(to: outputURL)
 ```
 
