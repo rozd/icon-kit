@@ -100,4 +100,34 @@ struct HexColorTests {
             try parseHexColor("#")
         }
     }
+
+    // MARK: - parseHexIconColor
+
+    @Test("parseHexIconColor returns sRGB IconColor")
+    func parseHexIconColorSRGB() throws {
+        let color = try parseHexIconColor("#FF0000")
+        #expect(color.colorSpace == .sRGB)
+        #expect(color.components.count == 4)
+        #expect(color.components[0] == 1.0) // red
+        #expect(color.components[1] == 0.0) // green
+        #expect(color.components[2] == 0.0) // blue
+        #expect(color.components[3] == 1.0) // alpha
+    }
+
+    @Test("parseHexIconColor preserves alpha from 8-digit hex")
+    func parseHexIconColorAlpha() throws {
+        let color = try parseHexIconColor("#0000FF80")
+        #expect(color.colorSpace == .sRGB)
+        #expect(color.components[0] == 0.0)
+        #expect(color.components[1] == 0.0)
+        #expect(abs(color.components[2] - 1.0) < 0.01)
+        #expect(abs(color.components[3] - 128.0 / 255.0) < 0.01)
+    }
+
+    @Test("parseHexIconColor propagates errors for invalid input")
+    func parseHexIconColorInvalid() {
+        #expect(throws: HexColorError.self) {
+            try parseHexIconColor("#GGG")
+        }
+    }
 }
