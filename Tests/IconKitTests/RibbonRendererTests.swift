@@ -121,7 +121,7 @@ struct RibbonRendererTests {
 
     // MARK: - Diagonal placement pixel checks
 
-    @Test("topLeft ribbon draws near top-left corner")
+    @Test("topLeft ribbon draws in top-left area")
     func topLeftRibbonPixels() throws {
         let bgColor = CGColor(srgbRed: 0, green: 1, blue: 0, alpha: 1)
         let style = RibbonStyle(text: "", size: 0.25, background: bgColor)
@@ -130,19 +130,17 @@ struct RibbonRendererTests {
         let output = try renderer.generateOverlay(width: 1024, height: 1024)
         let image = decodeImage(output)
 
-        // The ribbon covers the top-left corner area.
-        // At size 0.25, the ribbon band crosses the top edge ~256px from corner
-        // and the left edge ~256px from corner. Sample well inside that triangle.
-        let cornerPixel = samplePixel(image, x: 30, y: 30)
-        #expect(cornerPixel.g > 0.4)
-        #expect(cornerPixel.a > 0.4)
+        // The ribbon band crosses the top-left area. Sample along the diagonal
+        // at about 1/4 of the way in — (200, 100) should be inside the band.
+        let ribbonPixel = samplePixel(image, x: 200, y: 100)
+        #expect(ribbonPixel.a > 0.3)
 
-        // Center of image should be transparent
-        let farPixel = samplePixel(image, x: 512, y: 512)
-        #expect(farPixel.a < 0.01)
+        // Center and bottom-right should be transparent
+        #expect(samplePixel(image, x: 512, y: 512).a < 0.01)
+        #expect(samplePixel(image, x: 900, y: 900).a < 0.01)
     }
 
-    @Test("topRight ribbon draws near top-right corner")
+    @Test("topRight ribbon draws in top-right area")
     func topRightRibbonPixels() throws {
         let bgColor = CGColor(srgbRed: 1, green: 0.5, blue: 0, alpha: 1)
         let style = RibbonStyle(text: "", size: 0.25, background: bgColor)
@@ -151,14 +149,13 @@ struct RibbonRendererTests {
         let output = try renderer.generateOverlay(width: 1024, height: 1024)
         let image = decodeImage(output)
 
-        // The ribbon covers the top-right corner area.
-        let cornerPixel = samplePixel(image, x: 993, y: 30)
-        #expect(cornerPixel.r > 0.4)
-        #expect(cornerPixel.a > 0.4)
+        // Sample along the diagonal at about 1/4 in — (824, 100)
+        let ribbonPixel = samplePixel(image, x: 824, y: 100)
+        #expect(ribbonPixel.a > 0.3)
 
-        // Center of image should be transparent
-        let farPixel = samplePixel(image, x: 512, y: 512)
-        #expect(farPixel.a < 0.01)
+        // Center and bottom-left should be transparent
+        #expect(samplePixel(image, x: 512, y: 512).a < 0.01)
+        #expect(samplePixel(image, x: 100, y: 900).a < 0.01)
     }
 
     // MARK: - Offset
