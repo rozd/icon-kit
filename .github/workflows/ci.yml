@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Swift 6.2
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: 6.2
+
+      - name: Build
+        run: swift build
+
+      - name: Test with coverage
+        run: swift test --enable-code-coverage
+
+      - name: Export coverage to lcov
+        run: |
+          BIN=$(swift build --show-bin-path)
+          xcrun llvm-cov export \
+            "$BIN/IconKitPackageTests.xctest/Contents/MacOS/IconKitPackageTests" \
+            -instr-profile "$(find .build -name default.profdata -type f)" \
+            -format lcov > coverage.lcov
+
+      - name: Upload coverage report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.lcov
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.lcov
