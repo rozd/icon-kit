@@ -18,11 +18,11 @@ public struct RibbonRenderer: Sendable {
     /// Generate a transparent PNG overlay containing just the ribbon and text.
     ///
     /// The output image is fully transparent except for the ribbon band.
-    /// It is intended to be added as a front-most layer in an `.icon` bundle.
+    /// It can be used as an overlay layer in any icon format.
     ///
     /// - Parameters:
-    ///   - width: Canvas width in pixels (typically 1024).
-    ///   - height: Canvas height in pixels (typically 1024).
+    ///   - width: Canvas width in pixels.
+    ///   - height: Canvas height in pixels.
     /// - Returns: PNG data for the ribbon overlay image.
     public func generateOverlay(width: Int, height: Int) throws -> Data {
         guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),

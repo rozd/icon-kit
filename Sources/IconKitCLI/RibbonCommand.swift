@@ -16,10 +16,10 @@ struct RibbonCommand: ParsableCommand {
     @Option(name: .long, help: "Text to render on the ribbon.")
     var text: String
 
-    @Option(name: .long, help: "Path to input .icon bundle.")
+    @Option(name: .long, help: "Path to input icon (.icon bundle, adaptive icon XML, or Android res/ directory).")
     var input: String
 
-    @Option(name: .long, help: "Path to output .icon bundle.")
+    @Option(name: .long, help: "Path to output location.")
     var output: String
 
     @Option(name: .long, help: "Ribbon size as factor of icon height (0.0-1.0).")
@@ -57,12 +57,52 @@ struct RibbonCommand: ParsableCommand {
         let inputURL = URL(fileURLWithPath: input)
         let outputURL = URL(fileURLWithPath: output)
 
-        var descriptor = try IconComposerDescriptorFile(contentsOf: inputURL)
+        switch detectFormat(inputURL) {
+        case .iconComposer:
+            var descriptor = try IconComposerDescriptorFile(contentsOf: inputURL)
+            try descriptor.applyRibbon(placement: placement, style: style)
+            try descriptor.write(to: outputURL)
+            print("Added '\(text)' ribbon (\(placement.rawValue)) as overlay layer")
+            print("Wrote \(outputURL.lastPathComponent)")
 
-        try descriptor.applyRibbon(placement: placement, style: style)
-        try descriptor.write(to: outputURL)
-
-        print("Added '\(text)' ribbon (\(placement.rawValue)) as overlay layer")
-        print("Wrote \(outputURL.lastPathComponent)")
+        case .androidAdaptive:
+            var adaptive = try AdaptiveIconFile(contentsOf: inputURL)
+            try adaptive.applyRibbon(placement: placement, style: style)
+            try adaptive.write(to: outputURL)
+            print("Added '\(text)' ribbon (\(placement.rawValue)) to adaptive icon foreground")
+            print("Wrote to \(outputURL.path)")
+        }
     }
+}
+
+// MARK: - Format Detection
+
+private enum IconFormat {
+    case iconComposer
+    case androidAdaptive
+}
+
+private func detectFormat(_ url: URL) -> IconFormat {
+    let fm = FileManager.default
+
+    // .icon bundle: ends with .icon or contains icon.json
+    if url.pathExtension == "icon" {
+        return .iconComposer
+    }
+    if fm.fileExists(atPath: url.appendingPathComponent("icon.json").path) {
+        return .iconComposer
+    }
+
+    // Android adaptive icon: XML file
+    if url.pathExtension == "xml" {
+        return .androidAdaptive
+    }
+
+    // Android res/ directory: contains mipmap-anydpi-v26/
+    if fm.fileExists(atPath: url.appendingPathComponent("mipmap-anydpi-v26").path) {
+        return .androidAdaptive
+    }
+
+    // Default to .icon for backwards compatibility
+    return .iconComposer
 }

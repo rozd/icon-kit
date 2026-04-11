@@ -5,16 +5,17 @@
 [![codecov](https://codecov.io/gh/rozd/icon-kit/branch/main/graph/badge.svg)](https://codecov.io/gh/rozd/icon-kit)
 [![License](https://img.shields.io/github/license/rozd/icon-kit)](LICENSE)
 
-**A Swift library and CLI for working with Apple `.icon` bundles.**
+**A Swift library and CLI for working with Apple `.icon` bundles and Android adaptive icons.**
 
-IconKit reads and writes the `.icon` bundle format introduced with Icon Composer — Apple's structured icon format containing multiple image layers (front, middle, back) at various sizes, enabling dynamic rendering effects like parallax and lighting. Use it to generate icons from SF Symbols, inspect bundle structure, add environment ribbons to existing icons, manipulate layers programmatically, or validate round-trip fidelity.
+IconKit reads and writes the `.icon` bundle format introduced with Icon Composer — Apple's structured icon format containing multiple image layers (front, middle, back) at various sizes, enabling dynamic rendering effects like parallax and lighting. It also supports Android adaptive icons (XML format with PNG/WebP assets). Use it to generate icons from SF Symbols, inspect bundle structure, add environment ribbons to existing icons, manipulate layers programmatically, or validate round-trip fidelity.
 
 ---
 
 ## ✨ Features
 
 - 🔣 **SF Symbol Icons** — generate `.icon` bundles from any SF Symbol with configurable background, foreground color, size, and offset. Perfect for prototyping and internal tools.
-- 🎀 **Ribbon Overlays** — stamp UAT / QA / Staging labels onto any `.icon` bundle in one command. Configurable placement, colors, font, and size.
+- 🎀 **Ribbon Overlays** — stamp UAT / QA / Staging labels onto `.icon` bundles or Android adaptive icons in one command. Configurable placement, colors, font, and size.
+- 🤖 **Android Adaptive Icons** — read and write Android adaptive icon XML format with PNG and WebP asset support. Ribbon overlays are composited onto foreground layers at each density.
 - 📦 **Round-Trip Safe** — read an `.icon` bundle, inspect or modify it, write it back out without data loss.
 - 🧩 **Full Document Model** — typed Swift structs for every part of the `.icon` format: groups, layers, fills, shadows, blend modes, specializations, and platform targeting.
 - 🎨 **Appearance & Idiom Variants** — first-class support for light/dark/tinted appearances and per-platform (iOS, macOS, watchOS, visionOS) specializations.
@@ -77,6 +78,26 @@ iconkit ribbon topLeft \
 | `--font-scale` | `0.6` | Text size as a factor of ribbon height |
 
 </details>
+
+### Add a ribbon to an Android adaptive icon
+
+The same `ribbon` command works with Android adaptive icons. Pass a `res/` directory or an adaptive icon XML file:
+
+```bash
+# From a res/ directory (auto-discovers XML in mipmap-anydpi-v26/)
+iconkit ribbon bottom \
+  --text "DEV" \
+  --input app/src/main/res \
+  --output app/src/debug/res
+
+# From an XML file directly
+iconkit ribbon topLeft \
+  --text "QA" \
+  --input res/mipmap-anydpi-v26/ic_launcher.xml \
+  --output res-qa
+```
+
+The ribbon is composited onto every density variant of the foreground layer (mdpi through xxxhdpi). Input format is auto-detected. WebP foreground images are supported (read as WebP, written back as PNG after compositing).
 
 ### Generate an icon from an SF Symbol
 
@@ -202,6 +223,21 @@ try icon.applyRibbon(placement: .top, style: style)
 try icon.write(to: outputURL)
 ```
 
+### Add a ribbon to an Android adaptive icon
+
+```swift
+var icon = try AdaptiveIconFile(contentsOf: resDirURL)
+
+let style = RibbonStyle(
+    text: "DEV",
+    background: try parseHexColor("#4A90D9"),
+    foreground: try parseHexColor("#FFFFFF")
+)
+
+try icon.applyRibbon(placement: .bottom, style: style)
+try icon.write(to: outputResDirURL)
+```
+
 ### Generate an icon from an SF Symbol
 
 ```swift
@@ -254,3 +290,21 @@ AppIcon.icon/
 IconKit models the full `icon.json` structure as typed Swift structs — `IconDocument`, `IconGroup`, `IconLayer`, and supporting types like `IconFill`, `IconShadow`, `IconBlendMode`, and `Specialization<T>`. Every field round-trips cleanly through `Codable`.
 
 The ribbon feature works by generating a transparent PNG overlay and inserting it as the front-most layer (group index 0), with liquid glass automatically disabled to ensure opaque, true colors.
+
+### Android Adaptive Icons
+
+An Android adaptive icon is an XML descriptor referencing foreground and background layers:
+
+```
+res/
+├── mipmap-anydpi-v26/
+│   └── ic_launcher.xml    # <adaptive-icon> descriptor
+├── mipmap-hdpi/
+│   ├── ic_launcher_foreground.png   # (or .webp)
+│   └── ic_launcher_background.png
+├── mipmap-xxhdpi/
+│   └── ...
+└── ...
+```
+
+Since Android adaptive icons only support foreground + background layers (no arbitrary layer stacking), ribbons are composited directly onto the foreground PNG at each density. Both PNG and WebP inputs are supported.
