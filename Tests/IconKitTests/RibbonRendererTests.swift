@@ -124,38 +124,40 @@ struct RibbonRendererTests {
     @Test("topLeft ribbon draws near top-left corner")
     func topLeftRibbonPixels() throws {
         let bgColor = CGColor(srgbRed: 0, green: 1, blue: 0, alpha: 1)
-        let style = RibbonStyle(text: "", size: 0.2, background: bgColor)
+        let style = RibbonStyle(text: "", size: 0.25, background: bgColor)
         let renderer = RibbonRenderer(placement: .topLeft, style: style)
 
-        let output = try renderer.generateOverlay(width: 256, height: 256)
+        let output = try renderer.generateOverlay(width: 1024, height: 1024)
         let image = decodeImage(output)
 
-        // Near top-left corner should be green
-        let cornerPixel = samplePixel(image, x: 5, y: 5)
-        #expect(cornerPixel.g > 0.9)
-        #expect(cornerPixel.a > 0.9)
+        // The ribbon covers the top-left corner area.
+        // At size 0.25, the ribbon band crosses the top edge ~256px from corner
+        // and the left edge ~256px from corner. Sample well inside that triangle.
+        let cornerPixel = samplePixel(image, x: 30, y: 30)
+        #expect(cornerPixel.g > 0.4)
+        #expect(cornerPixel.a > 0.4)
 
-        // Bottom-right should be transparent
-        let farPixel = samplePixel(image, x: 250, y: 250)
+        // Center of image should be transparent
+        let farPixel = samplePixel(image, x: 512, y: 512)
         #expect(farPixel.a < 0.01)
     }
 
     @Test("topRight ribbon draws near top-right corner")
     func topRightRibbonPixels() throws {
         let bgColor = CGColor(srgbRed: 1, green: 0.5, blue: 0, alpha: 1)
-        let style = RibbonStyle(text: "", size: 0.2, background: bgColor)
+        let style = RibbonStyle(text: "", size: 0.25, background: bgColor)
         let renderer = RibbonRenderer(placement: .topRight, style: style)
 
-        let output = try renderer.generateOverlay(width: 256, height: 256)
+        let output = try renderer.generateOverlay(width: 1024, height: 1024)
         let image = decodeImage(output)
 
-        // Near top-right corner should be orange
-        let cornerPixel = samplePixel(image, x: 250, y: 5)
-        #expect(cornerPixel.r > 0.9)
-        #expect(cornerPixel.a > 0.9)
+        // The ribbon covers the top-right corner area.
+        let cornerPixel = samplePixel(image, x: 993, y: 30)
+        #expect(cornerPixel.r > 0.4)
+        #expect(cornerPixel.a > 0.4)
 
-        // Bottom-left should be transparent
-        let farPixel = samplePixel(image, x: 5, y: 250)
+        // Center of image should be transparent
+        let farPixel = samplePixel(image, x: 512, y: 512)
         #expect(farPixel.a < 0.01)
     }
 

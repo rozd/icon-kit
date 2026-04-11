@@ -74,7 +74,8 @@ public struct RibbonRenderer: Sendable {
                 offsetPixels: offsetPixels,
                 angle: -.pi / 4,
                 pivotX: 0,
-                pivotY: Double(height)
+                pivotY: Double(height),
+                textDirection: 1.0
             )
         case .topRight:
             drawDiagonalRibbon(
@@ -85,7 +86,8 @@ public struct RibbonRenderer: Sendable {
                 offsetPixels: offsetPixels,
                 angle: .pi / 4,
                 pivotX: Double(width),
-                pivotY: Double(height)
+                pivotY: Double(height),
+                textDirection: -1.0
             )
         }
 
@@ -139,18 +141,27 @@ public struct RibbonRenderer: Sendable {
         offsetPixels: Double,
         angle: Double,
         pivotX: Double,
-        pivotY: Double
+        pivotY: Double,
+        textDirection: Double
     ) {
-        let ribbonLength = max(imageWidth, imageHeight) * 2.0
+        // The ribbon center sits at `size * height` distance from the corner
+        // along the perpendicular to the ribbon. The ribbon spans from edge
+        // to edge at that distance. For a square icon at distance d from the
+        // corner, the ribbon length that crosses both edges is 2*d.
+        let distance = ribbonHeight / 2 + offsetPixels
+        let ribbonLength = 2.0 * (distance + ribbonHeight)
 
         context.saveGState()
 
+        // Move origin to the corner, then rotate
         context.translateBy(x: pivotX, y: pivotY)
         context.rotate(by: angle)
 
+        // In the rotated frame, the ribbon is a horizontal band.
+        // Position its center at -distance along Y (into the icon interior).
         let ribbonRect = CGRect(
             x: -ribbonLength / 2,
-            y: -ribbonHeight / 2 - offsetPixels,
+            y: -distance - ribbonHeight / 2,
             width: ribbonLength,
             height: ribbonHeight
         )
@@ -164,7 +175,9 @@ public struct RibbonRenderer: Sendable {
         let line = makeLine(fontSize: fontSize)
         let textBounds = CTLineGetBoundsWithOptions(line, .useOpticalBounds)
 
-        let availableWidth = min(ribbonLength * 0.8, imageWidth * 0.6)
+        // Available width for text is based on the visible ribbon segment,
+        // which is approximately 2 * distance wide
+        let availableWidth = 2.0 * distance * 0.7
         let finalLine: CTLine
         let finalBounds: CGRect
         if textBounds.width > availableWidth {
@@ -176,8 +189,13 @@ public struct RibbonRenderer: Sendable {
             finalBounds = textBounds
         }
 
+        // Center text in the visible portion of the ribbon.
+        // In the rotated frame, x=0 maps to the image corner (clipped by squircle),
+        // so shift text toward the icon interior along the ribbon.
+        let visibleCenterX = textDirection * (distance + ribbonHeight / 2)
         context.setFillColor(style.foreground)
-        let textX = ribbonRect.midX - finalBounds.width / 2 - finalBounds.origin.x
+        context.textMatrix = .identity
+        let textX = visibleCenterX - finalBounds.width / 2 - finalBounds.origin.x
         let textY = ribbonRect.midY - finalBounds.height / 2 - finalBounds.origin.y
         context.textPosition = CGPoint(x: textX, y: textY)
         CTLineDraw(finalLine, context)
