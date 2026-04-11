@@ -16,6 +16,7 @@ jobs:
           fetch-depth: 0
 
       - name: Resolve version and create release
+        id: create_release
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -142,3 +143,61 @@ jobs:
             --notes "$BODY"
 
           echo "Released ${NEW_TAG}"
+
+          # --- Export version for downstream steps ----------------------------
+
+          VERSION="${NEW_TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+          echo "released=true" >> "$GITHUB_OUTPUT"
+
+      - name: Update Homebrew tap
+        if: steps.create_release.outputs.released == 'true'
+        env:
+          VERSION: ${{ steps.create_release.outputs.version }}
+          TAG: ${{ steps.create_release.outputs.tag }}
+          REPO: ${{ github.repository }}
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Download source tarball and compute SHA256
+          curl -sL "https://github.com/${REPO}/archive/refs/tags/${TAG}.tar.gz" -o source.tar.gz
+          SHA256=$(sha256sum source.tar.gz | awk '{print $1}')
+          echo "SHA256: ${SHA256}"
+
+          # Clone the Homebrew tap repository
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/rozd/homebrew-iconkit.git" tap
+          cd tap
+
+          # Write updated formula
+          mkdir -p Formula
+          cat > Formula/iconkit.rb << FORMULA_EOF
+          class Iconkit < Formula
+            desc "CLI tool for working with Apple .icon bundles"
+            homepage "https://github.com/rozd/icon-kit"
+            url "https://github.com/rozd/icon-kit/archive/refs/tags/v${VERSION}.tar.gz"
+            sha256 "${SHA256}"
+            license "MIT"
+
+            depends_on xcode: ["16.0", :build]
+            depends_on :macos
+
+            def install
+              system "swift", "build", "--disable-sandbox", "--configuration", "release"
+              bin.install ".build/release/iconkit"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/iconkit --version")
+            end
+          end
+          FORMULA_EOF
+
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/iconkit.rb
+          git diff --staged --quiet && echo "No formula changes" && exit 0
+          git commit -m "Update iconkit to ${VERSION}"
+          git push

@@ -23,7 +23,14 @@ IconKit reads and writes the `.icon` bundle format introduced with Icon Composer
 
 ### Install
 
-Build from source:
+#### Homebrew
+
+```bash
+brew tap rozd/iconkit
+brew install iconkit
+```
+
+#### Build from source
 
 ```bash
 swift build -c release
