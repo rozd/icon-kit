@@ -7,7 +7,7 @@
 
 **A Swift library and CLI for working with Apple `.icon` bundles.**
 
-IconKit reads and writes the `.icon` bundle format introduced with Icon Composer — Apple's structured icon format containing multiple image layers (front, middle, back) at various sizes, enabling dynamic rendering effects like parallax and lighting. Use it to add environment ribbons to existing icons, manipulate layers programmatically, or validate round-trip fidelity.
+IconKit reads and writes the `.icon` bundle format introduced with Icon Composer — Apple's structured icon format containing multiple image layers (front, middle, back) at various sizes, enabling dynamic rendering effects like parallax and lighting. Use it to inspect bundle structure, add environment ribbons to existing icons, manipulate layers programmatically, or validate round-trip fidelity.
 
 ---
 
@@ -77,6 +77,37 @@ iconkit ribbon topLeft \
 
 </details>
 
+### Inspect a bundle
+
+Examine the structure of an `.icon` bundle:
+
+```bash
+iconkit inspect AppIcon.icon
+```
+
+```
+AppIcon.icon
+  Fill: automatic-gradient srgb:0.69804,0.65098,0.60392,1.00000
+  Platforms: circles [watchOS], squares shared
+  Group 1
+    Lighting: individual
+    Shadow: none (opacity: 0.5)
+    Layer "Fitness Art"
+      Image: Fitness Art.png
+      Glass: true
+      Position: scale 2.0, translate (0.0, 0.0)
+      Fill specializations:
+        [default] solid display-p3:0.05882,0.08235,0.09804,1.00000
+        [dark] solid display-p3:0.94902,0.93725,0.87843,1.00000
+  Assets: 1 present, 0 missing
+```
+
+Use `--json` for machine-readable output (raw `icon.json`, pretty-printed):
+
+```bash
+iconkit inspect --json AppIcon.icon
+```
+
 ### Validate round-trip fidelity
 
 Read a bundle and write it back to verify nothing is lost:
@@ -116,8 +147,9 @@ Then add the product to your target:
 import IconKit
 
 let icon = try IconComposerDescriptorFile(contentsOf: bundleURL)
-print("Groups: \(icon.document.groups.count)")
-print("Assets: \(icon.assets.count)")
+
+// Human-readable summary
+print(icon.inspectSummary(bundleName: "AppIcon.icon"))
 
 // Check for missing referenced assets
 let warnings = icon.validateAssets()
