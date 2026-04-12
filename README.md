@@ -166,6 +166,67 @@ Read a bundle and write it back to verify nothing is lost:
 iconkit test --input AppIcon.icon --output AppIcon.copy.icon
 ```
 
+## 🤖 GitHub Action
+
+Stamp environment ribbons onto your app icons in CI/CD before building:
+
+```yaml
+- uses: rozd/icon-kit@v1
+  with:
+    text: UAT
+    input: App/Assets.xcassets/AppIcon.icon
+```
+
+The action downloads a pre-built `iconkit` binary from the matching GitHub Release and runs the `ribbon` command. Currently requires a macOS runner (Linux support for Android-only projects is planned).
+
+### Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `text` | ✅ | — | Text to render on the ribbon |
+| `input` | ✅ | — | Path to `.icon` bundle, adaptive icon XML, or Android `res/` directory |
+| `output` | | *same as `input`* | Output path — omit for in-place modification |
+| `placement` | | `bottom` | `top`, `bottom`, `topLeft`, or `topRight` |
+| `size` | | `0.24` | Ribbon height as a factor of icon height |
+| `offset` | | `0.0` | Offset from edge as a factor of icon height |
+| `background` | | `#B92636` | Ribbon background color (hex) |
+| `foreground` | | `#FEFAFA` | Text color (hex) |
+| `font` | | System | Font family name |
+| `font-scale` | | `0.6` | Text size as a factor of ribbon height |
+| `version` | | *action ref* | Pin to a specific IconKit release (e.g. `v1.2.3`) |
+
+### Example: Stamp a UAT build
+
+```yaml
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: rozd/icon-kit@v1
+        with:
+          placement: topLeft
+          text: UAT
+          input: App/Assets.xcassets/AppIcon.icon
+          background: '#4A90D9'
+
+      - name: Build app
+        run: xcodebuild -project App.xcodeproj -scheme App archive
+```
+
+### Example: Android adaptive icon
+
+```yaml
+- uses: rozd/icon-kit@v1
+  with:
+    placement: bottom
+    text: DEV
+    input: app/src/main/res
+```
+
+The ribbon is composited onto every density variant of the foreground layer.
+
 ## 📦 Integration
 
 ### Swift Package Manager

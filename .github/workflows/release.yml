@@ -10,6 +10,10 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      released: ${{ steps.create_release.outputs.released }}
+      version: ${{ steps.create_release.outputs.version }}
+      tag: ${{ steps.create_release.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,7 +29,7 @@ jobs:
 
           # --- Determine base version and commit range -----------------------
 
-          LATEST_TAG=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+          LATEST_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
 
           if [ -z "$LATEST_TAG" ]; then
             BASE_VERSION="0.0.0"
@@ -151,11 +155,51 @@ jobs:
           echo "tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
           echo "released=true" >> "$GITHUB_OUTPUT"
 
-      - name: Update Homebrew tap
-        if: steps.create_release.outputs.released == 'true'
+  build-binary:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - name: Setup Swift 6.2
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: 6.2
+
+      - name: Build release binary
+        run: swift build -c release
+
+      - name: Package binary
+        id: package
+        run: |
+          set -euo pipefail
+          ARCH="$(uname -m)"
+          ASSET="iconkit-macos-${ARCH}.tar.gz"
+          tar -czf "${ASSET}" -C .build/release iconkit
+          shasum -a 256 "${ASSET}"
+          echo "asset=${ASSET}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload binary to release
         env:
-          VERSION: ${{ steps.create_release.outputs.version }}
-          TAG: ${{ steps.create_release.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release.outputs.tag }}
+          ASSET: ${{ steps.package.outputs.asset }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" "$ASSET" --clobber
+
+  update-homebrew:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Homebrew tap
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          TAG: ${{ needs.release.outputs.tag }}
           REPO: ${{ github.repository }}
           TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
@@ -201,3 +245,35 @@ jobs:
           git diff --staged --quiet && echo "No formula changes" && exit 0
           git commit -m "Update iconkit to ${VERSION}"
           git push
+
+  update-action-tag:
+    needs: [release, build-binary]
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update floating major version tag
+        env:
+          TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          # Extract major version (v1.2.3 -> v1)
+          MAJOR_TAG=$(echo "$TAG" | sed -E 's/^(v[0-9]+)\..*/\1/')
+
+          if [ -z "$MAJOR_TAG" ] || [ "$MAJOR_TAG" = "$TAG" ]; then
+            echo "::error::Could not derive major version tag from $TAG"
+            exit 1
+          fi
+
+          echo "Updating $MAJOR_TAG -> $TAG"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Force-update the floating major version tag to the release commit
+          git tag -f "$MAJOR_TAG" "$TAG"
+          git push origin "$MAJOR_TAG" --force

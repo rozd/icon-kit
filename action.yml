@@ -1,0 +1,159 @@
+name: 'IconKit Ribbon'
+description: 'Add environment ribbons (UAT/QA/DEV/etc.) to iOS .icon bundles and Android adaptive icons.'
+author: 'rozd'
+
+branding:
+  icon: 'image'
+  color: 'red'
+
+inputs:
+  text:
+    description: 'Text to render on the ribbon (e.g. "UAT", "QA", "DEV").'
+    required: true
+  input:
+    description: 'Path to input icon (.icon bundle, adaptive icon XML, or Android res/ directory).'
+    required: true
+  output:
+    description: 'Path to output location. Defaults to the input path for in-place modification.'
+    required: false
+    default: ''
+  placement:
+    description: 'Ribbon placement: top, bottom, topLeft, topRight.'
+    required: false
+    default: 'bottom'
+  size:
+    description: 'Ribbon height as a factor of icon height (0.0–1.0).'
+    required: false
+    default: '0.24'
+  offset:
+    description: 'Offset from edge as a factor of icon height (0.0–1.0).'
+    required: false
+    default: '0.0'
+  background:
+    description: 'Ribbon background color as hex (e.g. "#B92636" or "#B92636FF").'
+    required: false
+    default: '#B92636'
+  foreground:
+    description: 'Text color as hex (e.g. "#FEFAFA").'
+    required: false
+    default: '#FEFAFA'
+  font:
+    description: 'Font family name. Defaults to Helvetica Neue Bold.'
+    required: false
+    default: ''
+  font-scale:
+    description: 'Text size as a factor of ribbon height (0.0–1.0).'
+    required: false
+    default: '0.6'
+  version:
+    description: 'IconKit release to use (e.g. "v1.2.3"). Defaults to the release matching the action ref, or latest.'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install IconKit
+      shell: bash
+      env:
+        IK_ACTION_REF: ${{ github.action_ref }}
+        IK_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+
+        # --- Resolve version ----------------------------------------------
+        if [ -n "${IK_VERSION}" ]; then
+          TAG="${IK_VERSION}"
+        elif [[ "${IK_ACTION_REF:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          TAG="${IK_ACTION_REF}"
+        else
+          TAG=""
+        fi
+
+        # --- Detect platform ----------------------------------------------
+        OS_RAW="$(uname -s)"
+        ARCH_RAW="$(uname -m)"
+
+        case "${OS_RAW}" in
+          Darwin) OS="macos" ;;
+          Linux)  OS="linux" ;;
+          *)
+            echo "::error::Unsupported OS: ${OS_RAW}. IconKit currently supports macOS only."
+            exit 1
+            ;;
+        esac
+
+        case "${ARCH_RAW}" in
+          arm64|aarch64) ARCH="arm64" ;;
+          x86_64)        ARCH="x86_64" ;;
+          *)
+            echo "::error::Unsupported architecture: ${ARCH_RAW}"
+            exit 1
+            ;;
+        esac
+
+        ASSET="iconkit-${OS}-${ARCH}.tar.gz"
+
+        if [ -n "${TAG}" ]; then
+          DOWNLOAD_URL="https://github.com/rozd/icon-kit/releases/download/${TAG}/${ASSET}"
+          echo "Downloading IconKit ${TAG} (${ASSET})"
+        else
+          DOWNLOAD_URL="https://github.com/rozd/icon-kit/releases/latest/download/${ASSET}"
+          echo "Downloading latest IconKit (${ASSET})"
+        fi
+
+        DEST="${RUNNER_TEMP}/iconkit"
+        mkdir -p "${DEST}"
+
+        if ! curl -fsSL "${DOWNLOAD_URL}" -o "${DEST}/${ASSET}"; then
+          echo "::error::Failed to download IconKit binary from ${DOWNLOAD_URL}"
+          echo "::error::Check that a release exists with the asset ${ASSET} attached."
+          exit 1
+        fi
+
+        tar -xzf "${DEST}/${ASSET}" -C "${DEST}"
+        chmod +x "${DEST}/iconkit"
+        echo "${DEST}" >> "${GITHUB_PATH}"
+
+        # Verify installation (GITHUB_PATH only takes effect in next step,
+        # so invoke directly here)
+        "${DEST}/iconkit" --version || true
+
+    - name: Add ribbon to icon
+      shell: bash
+      env:
+        IK_PLACEMENT: ${{ inputs.placement }}
+        IK_TEXT: ${{ inputs.text }}
+        IK_INPUT: ${{ inputs.input }}
+        IK_OUTPUT: ${{ inputs.output }}
+        IK_SIZE: ${{ inputs.size }}
+        IK_OFFSET: ${{ inputs.offset }}
+        IK_BACKGROUND: ${{ inputs.background }}
+        IK_FOREGROUND: ${{ inputs.foreground }}
+        IK_FONT: ${{ inputs.font }}
+        IK_FONT_SCALE: ${{ inputs.font-scale }}
+      run: |
+        set -euo pipefail
+
+        # Default output to input (in-place modification)
+        if [ -z "${IK_OUTPUT}" ]; then
+          IK_OUTPUT="${IK_INPUT}"
+        fi
+
+        ARGS=(
+          "${IK_PLACEMENT}"
+          --text       "${IK_TEXT}"
+          --input      "${IK_INPUT}"
+          --output     "${IK_OUTPUT}"
+          --size       "${IK_SIZE}"
+          --offset     "${IK_OFFSET}"
+          --background "${IK_BACKGROUND}"
+          --foreground "${IK_FOREGROUND}"
+          --font-scale "${IK_FONT_SCALE}"
+        )
+
+        if [ -n "${IK_FONT}" ]; then
+          ARGS+=(--font "${IK_FONT}")
+        fi
+
+        iconkit ribbon "${ARGS[@]}"
