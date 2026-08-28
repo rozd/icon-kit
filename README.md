@@ -15,7 +15,7 @@ IconKit reads and writes the `.icon` bundle format introduced with Icon Composer
 
 - 🔣 **SF Symbol Icons** — generate `.icon` bundles from any SF Symbol with configurable background, foreground color, size, and offset. Perfect for prototyping and internal tools.
 - 🎀 **Ribbon Overlays** — stamp UAT / QA / Staging labels onto `.icon` bundles or Android adaptive icons in one command. Configurable placement, colors, font, and size.
-- 🤖 **Android Adaptive Icons** — read and write Android adaptive icon XML format with PNG and WebP asset support. Ribbon overlays are composited onto foreground layers at each density.
+- 🤖 **Android Adaptive Icons & Vector Drawables** — read and write Android adaptive icons in both modern vector drawable (`<vector>` XML) and bitmap (PNG/WebP) formats. Foreground vectors are rendered and stamped across all densities (mdpi through xxxhdpi), with legacy launcher icon support.
 - 📦 **Round-Trip Safe** — read an `.icon` bundle, inspect or modify it, write it back out without data loss.
 - 🧩 **Full Document Model** — typed Swift structs for every part of the `.icon` format: groups, layers, fills, shadows, blend modes, specializations, and platform targeting.
 - 🎨 **Appearance & Idiom Variants** — first-class support for light/dark/tinted appearances and per-platform (iOS, macOS, watchOS, visionOS) specializations.
@@ -359,13 +359,15 @@ An Android adaptive icon is an XML descriptor referencing foreground and backgro
 ```
 res/
 ├── mipmap-anydpi-v26/
-│   └── ic_launcher.xml    # <adaptive-icon> descriptor
-├── mipmap-hdpi/
-│   ├── ic_launcher_foreground.png   # (or .webp)
-│   └── ic_launcher_background.png
-├── mipmap-xxhdpi/
-│   └── ...
-└── ...
+│   ├── ic_launcher.xml        # <adaptive-icon> descriptor
+│   └── ic_launcher_round.xml
+├── drawable/
+│   └── ic_launcher_foreground.xml  # Vector Drawable (<vector>) or PNG/WebP
+├── values/
+│   └── ic_launcher_background.xml  # Color definition (<color>)
+└── mipmap-xxhdpi/
+    ├── ic_launcher.png             # Legacy launcher icon (or .webp)
+    └── ic_launcher_round.png
 ```
 
-Since Android adaptive icons only support foreground + background layers (no arbitrary layer stacking), ribbons are composited directly onto the foreground PNG at each density. Both PNG and WebP inputs are supported.
+IconKit supports both modern Vector Drawable foregrounds (`<vector>` XML) and density-qualified bitmap assets (`.png` and `.webp`). When a Vector Drawable is used, IconKit renders it at all standard densities (mdpi: 108px, hdpi: 162px, xhdpi: 216px, xxhdpi: 324px, xxxhdpi: 432px), composites the ribbon, and writes clean density assets compatible with Android's AAPT2 build system. Legacy launcher icons (`mipmap-*/ic_launcher.*`) are also automatically stamped.

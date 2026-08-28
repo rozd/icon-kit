@@ -8,7 +8,7 @@ public enum AdaptiveIconError: Error, LocalizedError {
     case invalidXML(String)
     /// The adaptive icon XML has no foreground drawable reference.
     case missingForeground
-    /// No foreground PNG images were found in any density directory.
+    /// No foreground images or vector drawables were found.
     case noForegroundImages
     /// A drawable reference could not be resolved to a file.
     case cannotResolveDrawable(String)
@@ -24,7 +24,7 @@ public enum AdaptiveIconError: Error, LocalizedError {
         case .missingForeground:
             "Adaptive icon XML has no foreground drawable reference."
         case .noForegroundImages:
-            "No foreground PNG images found in any density directory."
+            "No foreground images or vector drawable found for adaptive icon."
         case .cannotResolveDrawable(let ref):
             "Cannot resolve drawable reference '\(ref)'."
         case .resDirectoryNotFound(let url):
