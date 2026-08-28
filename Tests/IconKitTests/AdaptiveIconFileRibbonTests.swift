@@ -10,23 +10,89 @@ struct AdaptiveIconFileRibbonTests {
 
     // MARK: - Helpers
 
-    private func makePNG(width: Int, height: Int, r: CGFloat = 0, g: CGFloat = 0.5, b: CGFloat = 1, a: CGFloat = 1) -> Data {
+    /// Create a dummy AdaptiveIconFile in memory for testing ribbon application.
+    private func makeAdaptiveIconFile(
+        densities: [String: Int],
+        legacy: [String: [String: Int]] = [:]
+    ) -> AdaptiveIconFile {
+        let descriptor = AdaptiveIcon(
+            background: "@color/ic_launcher_background",
+            foreground: "@drawable/ic_launcher_foreground"
+        )
+        let xmlData = descriptor.xmlData()
+
+        var foregroundImages: [String: Data] = [:]
+        for (dirName, size) in densities {
+            foregroundImages[dirName] = makePNG(width: size, height: size, r: 1, g: 1, b: 1)
+        }
+
+        var legacyIcons: [String: [String: Data]] = [:]
+        var legacyExtensions: [String: [String: String]] = [:]
+        for (iconName, densitySizes) in legacy {
+            var densityMap: [String: Data] = [:]
+            var extMap: [String: String] = [:]
+            for (dirName, size) in densitySizes {
+                densityMap[dirName] = makePNG(width: size, height: size, r: 1, g: 1, b: 1)
+                extMap[dirName] = "webp"
+            }
+            legacyIcons[iconName] = densityMap
+            legacyExtensions[iconName] = extMap
+        }
+
+        return AdaptiveIconFile(
+            descriptor: descriptor,
+            xmlData: xmlData,
+            xmlRelativePath: "mipmap-anydpi-v26/ic_launcher.xml",
+            resDirectory: URL(fileURLWithPath: "/dummy"),
+            foregroundImages: foregroundImages,
+            backgroundImages: [:],
+            legacyIcons: legacyIcons,
+            legacyExtensions: legacyExtensions
+        )
+    }
+
+    private func makePNG(width: Int, height: Int, r: CGFloat, g: CGFloat, b: CGFloat, a: CGFloat = 1.0) -> Data {
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
         let context = CGContext(
-            data: nil, width: width, height: height,
-            bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         )!
+        context.clear(CGRect(x: 0, y: 0, width: width, height: height))
         context.setFillColor(CGColor(srgbRed: r, green: g, blue: b, alpha: a))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         let image = context.makeImage()!
         let data = NSMutableData()
         let dest = CGImageDestinationCreateWithData(
-            data as CFMutableData, UTType.png.identifier as CFString, 1, nil
+            data as CFMutableData,
+            UTType.png.identifier as CFString,
+            1,
+            nil
         )!
         CGImageDestinationAddImage(dest, image, nil)
         CGImageDestinationFinalize(dest)
         return data as Data
+    }
+
+    private func makeInsetPNG(width: Int, height: Int, inset: Int) -> CGImage {
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.clear(CGRect(x: 0, y: 0, width: width, height: height))
+        context.setFillColor(CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: inset, y: inset, width: width - inset * 2, height: height - inset * 2))
+        return context.makeImage()!
     }
 
     private func decodeImage(_ data: Data) -> CGImage {
@@ -38,38 +104,20 @@ struct AdaptiveIconFileRibbonTests {
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
         var pixel: [UInt8] = [0, 0, 0, 0]
         let context = CGContext(
-            data: &pixel, width: 1, height: 1,
-            bitsPerComponent: 8, bytesPerRow: 4, space: colorSpace,
+            data: &pixel,
+            width: 1,
+            height: 1,
+            bitsPerComponent: 8,
+            bytesPerRow: 4,
+            space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         )!
         context.draw(image, in: CGRect(x: -x, y: -(image.height - 1 - y), width: image.width, height: image.height))
-        return (
-            r: CGFloat(pixel[0]) / 255.0,
-            g: CGFloat(pixel[1]) / 255.0,
-            b: CGFloat(pixel[2]) / 255.0,
-            a: CGFloat(pixel[3]) / 255.0
-        )
-    }
-
-    private func makeAdaptiveIconFile(densities: [String: Int]) -> AdaptiveIconFile {
-        var foreground: [String: Data] = [:]
-        for (density, size) in densities {
-            foreground[density] = makePNG(width: size, height: size)
-        }
-        return AdaptiveIconFile(
-            descriptor: AdaptiveIcon(
-                background: "@mipmap/bg",
-                foreground: "@mipmap/fg"
-            ),
-            xmlData: AdaptiveIcon(
-                background: "@mipmap/bg",
-                foreground: "@mipmap/fg"
-            ).xmlData(),
-            xmlRelativePath: "mipmap-anydpi-v26/ic_launcher.xml",
-            resDirectory: URL(fileURLWithPath: "/tmp"),
-            foregroundImages: foreground,
-            backgroundImages: [:]
-        )
+        let a = CGFloat(pixel[3]) / 255.0
+        let r = a > 0 ? (CGFloat(pixel[0]) / 255.0) / a : 0
+        let g = a > 0 ? (CGFloat(pixel[1]) / 255.0) / a : 0
+        let b = a > 0 ? (CGFloat(pixel[2]) / 255.0) / a : 0
+        return (r: r, g: g, b: b, a: a)
     }
 
     // MARK: - Tests
@@ -77,24 +125,24 @@ struct AdaptiveIconFileRibbonTests {
     @Test("applyRibbon modifies all foreground density variants")
     func modifiesAllDensities() throws {
         var file = makeAdaptiveIconFile(densities: [
-            "mipmap-mdpi": 108,
-            "mipmap-hdpi": 162,
-            "mipmap-xxxhdpi": 432,
+            "drawable-mdpi": 108,
+            "drawable-hdpi": 162,
+            "drawable-xhdpi": 216,
+            "drawable-xxhdpi": 324,
+            "drawable-xxxhdpi": 432,
         ])
 
-        let originalData = file.foregroundImages
+        let originalData = file.foregroundImages["drawable-xxxhdpi"]!
+
         let style = RibbonStyle(text: "DEV")
         try file.applyRibbon(placement: .bottom, style: style)
 
-        // All densities should be modified
-        #expect(file.foregroundImages.count == 3)
-        for (density, data) in file.foregroundImages {
-            #expect(data != originalData[density])
-        }
+        #expect(file.foregroundImages.count == 5)
+        #expect(file.foregroundImages["drawable-xxxhdpi"]! != originalData)
     }
 
     @Test("Result dimensions match originals")
-    func preservesDimensions() throws {
+    func dimensionsPreserved() throws {
         var file = makeAdaptiveIconFile(densities: [
             "mipmap-hdpi": 162,
             "mipmap-xxxhdpi": 432,
@@ -121,8 +169,8 @@ struct AdaptiveIconFileRibbonTests {
         try file.applyRibbon(placement: .bottom, style: style)
 
         let image = decodeImage(file.foregroundImages["mipmap-xxhdpi"]!)
-        // Bottom area should have red ribbon pixels
-        let bottomPixel = samplePixel(image, x: 162, y: 320)
+        // Safe-zone bottom area (within 72dp viewport) should have red ribbon pixels
+        let bottomPixel = samplePixel(image, x: 162, y: 240)
         #expect(bottomPixel.r > 0.8)
         #expect(bottomPixel.a > 0.9)
     }
@@ -148,21 +196,64 @@ struct AdaptiveIconFileRibbonTests {
         #expect(file.backgroundImages["mipmap-hdpi"] == bgData)
     }
 
+    @Test("applyRibbon updates legacy launcher icons and converts extensions")
+    func legacyIconsUpdated() throws {
+        var file = makeAdaptiveIconFile(
+            densities: ["drawable-hdpi": 162],
+            legacy: [
+                "ic_launcher": ["mipmap-hdpi": 72],
+                "ic_launcher_round": ["mipmap-hdpi": 72],
+            ]
+        )
+
+        let style = RibbonStyle(text: "DEV")
+        try file.applyRibbon(placement: .bottom, style: style)
+
+        #expect(file.legacyIcons["ic_launcher"]?["mipmap-hdpi"] != nil)
+        #expect(file.legacyIcons["ic_launcher_round"]?["mipmap-hdpi"] != nil)
+        #expect(file.legacyExtensions["ic_launcher"]?["mipmap-hdpi"] == "png")
+        #expect(file.legacyExtensions["ic_launcher_round"]?["mipmap-hdpi"] == "png")
+    }
+
+    @Test("findContentBounds detects non-transparent area")
+    func testFindContentBounds() {
+        let image = makeInsetPNG(width: 100, height: 100, inset: 10)
+        let bounds = AdaptiveIconFile.findContentBounds(image)
+
+        #expect(bounds.origin.x == 10)
+        #expect(bounds.origin.y == 10)
+        #expect(bounds.width == 80)
+        #expect(bounds.height == 80)
+    }
+
+    @Test("findContentBounds on fully transparent image returns full canvas")
+    func testFindContentBoundsTransparent() {
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        let context = CGContext(
+            data: nil, width: 64, height: 64,
+            bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.clear(CGRect(x: 0, y: 0, width: 64, height: 64))
+        let emptyImage = context.makeImage()!
+
+        let bounds = AdaptiveIconFile.findContentBounds(emptyImage)
+        #expect(bounds.width == 64)
+        #expect(bounds.height == 64)
+    }
+
     // MARK: - WebP input handling
 
     @Test("applyRibbon converts WebP-origin foreground to PNG and updates extension")
     func webPConvertedToPNG() throws {
-        // Use PNG data with WebP extension tracking (simulates WebP input)
         var file = makeAdaptiveIconFile(densities: ["mipmap-hdpi": 162])
         file.foregroundExtensions["mipmap-hdpi"] = "webp"
 
         let style = RibbonStyle(text: "DEV")
         try file.applyRibbon(placement: .bottom, style: style)
 
-        // Extension should be updated to png after compositing
         #expect(file.foregroundExtensions["mipmap-hdpi"] == "png")
 
-        // Output should be valid PNG
         let resultFormat = ImageFormat.detect(from: file.foregroundImages["mipmap-hdpi"]!)
         #expect(resultFormat == .png)
 

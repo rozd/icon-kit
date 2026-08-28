@@ -57,6 +57,7 @@ runs:
       shell: bash
       env:
         IK_ACTION_REF: ${{ github.action_ref }}
+        IK_ACTION_PATH: ${{ github.action_path }}
         IK_VERSION: ${{ inputs.version }}
       run: |
         set -euo pipefail
@@ -93,25 +94,44 @@ runs:
         esac
 
         ASSET="iconkit-${OS}-${ARCH}.tar.gz"
-
-        if [ -n "${TAG}" ]; then
-          DOWNLOAD_URL="https://github.com/rozd/icon-kit/releases/download/${TAG}/${ASSET}"
-          echo "Downloading IconKit ${TAG} (${ASSET})"
-        else
-          DOWNLOAD_URL="https://github.com/rozd/icon-kit/releases/latest/download/${ASSET}"
-          echo "Downloading latest IconKit (${ASSET})"
-        fi
-
         DEST="${RUNNER_TEMP}/iconkit"
         mkdir -p "${DEST}"
 
-        if ! curl -fsSL "${DOWNLOAD_URL}" -o "${DEST}/${ASSET}"; then
-          echo "::error::Failed to download IconKit binary from ${DOWNLOAD_URL}"
-          echo "::error::Check that a release exists with the asset ${ASSET} attached."
-          exit 1
+        INSTALLED=false
+
+        if [ -n "${TAG}" ]; then
+          DOWNLOAD_URL="https://github.com/rozd/icon-kit/releases/download/${TAG}/${ASSET}"
+          echo "Attempting to download IconKit ${TAG} (${ASSET})..."
+          if curl -fsSL "${DOWNLOAD_URL}" -o "${DEST}/${ASSET}"; then
+            tar -xzf "${DEST}/${ASSET}" -C "${DEST}"
+            INSTALLED=true
+          else
+            echo "Pre-built binary for ${TAG} not available."
+          fi
+        elif [[ "${IK_ACTION_REF:-}" =~ ^v[0-9]+$ ]]; then
+          DOWNLOAD_URL="https://github.com/rozd/icon-kit/releases/latest/download/${ASSET}"
+          echo "Attempting to download latest IconKit release (${ASSET})..."
+          if curl -fsSL "${DOWNLOAD_URL}" -o "${DEST}/${ASSET}"; then
+            tar -xzf "${DEST}/${ASSET}" -C "${DEST}"
+            INSTALLED=true
+          else
+            echo "Latest release binary not available."
+          fi
         fi
 
-        tar -xzf "${DEST}/${ASSET}" -C "${DEST}"
+        # Fallback: build from action source if release asset is not available
+        if [ "${INSTALLED}" = "false" ]; then
+          if [ -d "${IK_ACTION_PATH:-}" ] && [ -f "${IK_ACTION_PATH}/Package.swift" ]; then
+            echo "Building IconKit from source at ${IK_ACTION_PATH}..."
+            swift build -c release --package-path "${IK_ACTION_PATH}"
+            cp "${IK_ACTION_PATH}/.build/release/iconkit" "${DEST}/iconkit"
+            INSTALLED=true
+          else
+            echo "::error::Failed to install IconKit. Pre-built binary not found and source path unavailable."
+            exit 1
+          fi
+        fi
+
         chmod +x "${DEST}/iconkit"
         echo "${DEST}" >> "${GITHUB_PATH}"
 

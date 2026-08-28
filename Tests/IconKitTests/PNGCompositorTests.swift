@@ -32,6 +32,29 @@ struct PNGCompositorTests {
         return data as Data
     }
 
+    /// Create a circle PNG (transparent outside circle).
+    private func makeCirclePNG(size: Int) -> Data {
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        let context = CGContext(
+            data: nil,
+            width: size,
+            height: size,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.clear(CGRect(x: 0, y: 0, width: size, height: size))
+        context.setFillColor(CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1))
+        context.fillEllipse(in: CGRect(x: 0, y: 0, width: size, height: size))
+        let image = context.makeImage()!
+        let data = NSMutableData()
+        let dest = CGImageDestinationCreateWithData(data as CFMutableData, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(dest, image, nil)
+        CGImageDestinationFinalize(dest)
+        return data as Data
+    }
+
     private func decodeImage(_ data: Data) -> CGImage {
         let source = CGImageSourceCreateWithData(data as CFData, nil)!
         return CGImageSourceCreateImageAtIndex(source, 0, nil)!
@@ -109,6 +132,24 @@ struct PNGCompositorTests {
         // Overlay should cover everything since it's scaled up
         let pixel = samplePixel(image, x: 64, y: 64)
         #expect(pixel.b > 0.9)
+    }
+
+    @Test("maskToBaseAlpha clips overlay to base non-transparent silhouette")
+    func maskToBaseAlpha() throws {
+        let base = makeCirclePNG(size: 100)
+        let overlay = makePNG(width: 100, height: 100, r: 0, g: 0, b: 1, a: 1)
+
+        let result = try PNGCompositor.composite(base: base, overlay: overlay, maskToBaseAlpha: true)
+        let image = decodeImage(result)
+
+        // Center should be blue (inside circle)
+        let center = samplePixel(image, x: 50, y: 50)
+        #expect(center.b > 0.9)
+        #expect(center.a > 0.9)
+
+        // Corner outside circle (e.g. x=2, y=2) should remain transparent
+        let corner = samplePixel(image, x: 2, y: 2)
+        #expect(corner.a < 0.05)
     }
 
     // MARK: - ImageFormat detection

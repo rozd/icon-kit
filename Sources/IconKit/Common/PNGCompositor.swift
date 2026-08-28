@@ -46,7 +46,8 @@ public enum ImageCompositor {
     public static func composite(
         base: Data,
         overlay: Data,
-        outputFormat: ImageFormat = .png
+        outputFormat: ImageFormat = .png,
+        maskToBaseAlpha: Bool = false
     ) throws -> Data {
         let baseImage = try decodeImage(base, label: "base")
         let overlayImage = try decodeImage(overlay, label: "overlay")
@@ -68,8 +69,17 @@ public enum ImageCompositor {
         }
 
         let rect = CGRect(x: 0, y: 0, width: width, height: height)
+        context.clear(rect)
         context.draw(baseImage, in: rect)
-        context.draw(overlayImage, in: rect)
+
+        if maskToBaseAlpha {
+            context.saveGState()
+            context.clip(to: rect, mask: baseImage)
+            context.draw(overlayImage, in: rect)
+            context.restoreGState()
+        } else {
+            context.draw(overlayImage, in: rect)
+        }
 
         guard let result = context.makeImage() else {
             throw ImageCompositorError.cannotCreateImage

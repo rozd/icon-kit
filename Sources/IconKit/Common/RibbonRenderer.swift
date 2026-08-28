@@ -23,8 +23,14 @@ public struct RibbonRenderer: Sendable {
     /// - Parameters:
     ///   - width: Canvas width in pixels.
     ///   - height: Canvas height in pixels.
+    ///   - viewport: Optional sub-rectangle of the canvas representing the visible icon area
+    ///               (e.g. the 72dp center area of a 108dp Android adaptive icon canvas).
     /// - Returns: PNG data for the ribbon overlay image.
-    public func generateOverlay(width: Int, height: Int) throws -> Data {
+    public func generateOverlay(
+        width: Int,
+        height: Int,
+        viewport: CGRect? = nil
+    ) throws -> Data {
         guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(
                   data: nil,
@@ -41,8 +47,9 @@ public struct RibbonRenderer: Sendable {
         // Start with fully transparent canvas
         context.clear(CGRect(x: 0, y: 0, width: width, height: height))
 
-        let ribbonHeight = style.size * Double(height)
-        let offsetPixels = style.offset * Double(height)
+        let targetArea = viewport ?? CGRect(x: 0, y: 0, width: Double(width), height: Double(height))
+        let ribbonHeight = style.size * targetArea.height
+        let offsetPixels = style.offset * targetArea.height
 
         switch placement {
         case .top:
@@ -50,26 +57,29 @@ public struct RibbonRenderer: Sendable {
                 in: context,
                 rect: CGRect(
                     x: 0,
-                    y: Double(height) - ribbonHeight - offsetPixels,
+                    y: targetArea.maxY - ribbonHeight - offsetPixels,
                     width: Double(width),
                     height: ribbonHeight
-                )
+                ),
+                textCenterX: targetArea.midX
             )
         case .bottom:
             drawHorizontalRibbon(
                 in: context,
                 rect: CGRect(
                     x: 0,
-                    y: offsetPixels,
+                    y: targetArea.minY + offsetPixels,
                     width: Double(width),
                     height: ribbonHeight
-                )
+                ),
+                textCenterX: targetArea.midX
             )
         case .topLeft, .topRight:
             drawDiagonalRibbon(
                 in: context,
-                width: Double(width),
-                height: Double(height),
+                canvasWidth: Double(width),
+                canvasHeight: Double(height),
+                targetArea: targetArea,
                 ribbonHeight: ribbonHeight,
                 offsetPixels: offsetPixels
             )
@@ -84,7 +94,11 @@ public struct RibbonRenderer: Sendable {
 
     // MARK: - Horizontal ribbon
 
-    private func drawHorizontalRibbon(in context: CGContext, rect: CGRect) {
+    private func drawHorizontalRibbon(
+        in context: CGContext,
+        rect: CGRect,
+        textCenterX: Double
+    ) {
         // Background
         context.setFillColor(style.background)
         context.fill(rect)
@@ -108,7 +122,7 @@ public struct RibbonRenderer: Sendable {
 
         context.saveGState()
         context.setFillColor(style.foreground)
-        let textX = rect.midX - finalBounds.width / 2 - finalBounds.origin.x
+        let textX = textCenterX - finalBounds.width / 2 - finalBounds.origin.x
         let textY = rect.midY - finalBounds.height / 2 - finalBounds.origin.y
         context.textPosition = CGPoint(x: textX, y: textY)
         CTLineDraw(finalLine, context)
@@ -118,16 +132,11 @@ public struct RibbonRenderer: Sendable {
     // MARK: - Diagonal ribbon
 
     /// Draw a diagonal corner ribbon using a transform-based approach:
-    ///
-    /// 1. Translate the context origin to the target corner (in CG coords).
-    /// 2. Rotate 45° (CW for topRight, CCW for topLeft).
-    /// 3. Position the ribbon so its top edge (pre-rotation) passes through the
-    ///    corner point (built-in offset of `ribbonHeight / 2`).
-    /// 4. Apply the user's `--offset` as additional displacement into the icon.
     private func drawDiagonalRibbon(
         in context: CGContext,
-        width: Double,
-        height: Double,
+        canvasWidth: Double,
+        canvasHeight: Double,
+        targetArea: CGRect,
         ribbonHeight: Double,
         offsetPixels: Double
     ) {
@@ -136,22 +145,19 @@ public struct RibbonRenderer: Sendable {
         let angle: Double
         switch placement {
         case .topRight:
-            cgCorner = CGPoint(x: width, y: height)
+            cgCorner = CGPoint(x: targetArea.maxX, y: targetArea.maxY)
             angle = -Double.pi / 4  // 45° CW
         case .topLeft:
-            cgCorner = CGPoint(x: 0, y: height)
+            cgCorner = CGPoint(x: targetArea.minX, y: targetArea.maxY)
             angle = Double.pi / 4   // 45° CCW
         default:
             return
         }
 
         // Ribbon long enough to always span beyond both canvas edges.
-        let ribbonLength = (width + height) * 2.0
+        let ribbonLength = (canvasWidth + canvasHeight) * 2.0
 
         // Perpendicular displacement in the rotated frame (-Y = into the icon):
-        //   Built-in: ribbonHeight/2 so the top edge touches the corner.
-        //   User offset: each screen-space leg = offsetPixels →
-        //     rotated-frame Y displacement = offsetPixels * √2.
         let ribbonCenterY = -(ribbonHeight / 2.0 + offsetPixels * sqrt(2.0))
 
         let ribbonRect = CGRect(
@@ -161,14 +167,13 @@ public struct RibbonRenderer: Sendable {
             height: ribbonHeight
         )
 
-        // Text sizing (same pattern as horizontal ribbon).
+        // Text sizing
         let fontSize = ribbonHeight * style.fontScale
         let line = makeLine(fontSize: fontSize)
         let textBounds = CTLineGetBoundsWithOptions(line, .useOpticalBounds)
 
-        // Visible chord length on a square canvas at this perpendicular depth ≈ 2·|centerY|.
         let visibleChord = 2.0 * abs(ribbonCenterY)
-        let availableWidth = visibleChord * 0.8
+        let availableWidth = max(visibleChord * 0.8, targetArea.width * 0.4)
 
         let finalLine: CTLine
         let finalBounds: CGRect
@@ -181,7 +186,6 @@ public struct RibbonRenderer: Sendable {
             finalBounds = textBounds
         }
 
-        // Text centered at x=0 (symmetric on square canvas due to 45° geometry).
         let textX = -finalBounds.width / 2.0 - finalBounds.origin.x
         let textY = ribbonCenterY - finalBounds.height / 2.0 - finalBounds.origin.y
 

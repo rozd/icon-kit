@@ -92,6 +92,46 @@ struct VectorDrawableTests {
         }
     }
 
+    @Test("Parse VectorDrawable with inline aapt gradient")
+    func parseGradient() throws {
+        let xml = """
+        <vector xmlns:android="http://schemas.android.com/apk/res/android"
+                xmlns:aapt="http://schemas.android.com/aapt"
+                android:width="108dp"
+                android:height="108dp">
+            <path android:pathData="M0,0h108v108h-108z">
+                <aapt:attr name="android:fillColor">
+                    <gradient
+                            android:startY="0"
+                            android:startX="54"
+                            android:endY="108"
+                            android:endX="54"
+                            android:type="linear">
+                        <item android:offset="0" android:color="#FFC8C1B8"/>
+                        <item android:offset="1" android:color="#FFB2A69A"/>
+                    </gradient>
+                </aapt:attr>
+            </path>
+        </vector>
+        """
+        let vector = try VectorDrawable(xmlData: Data(xml.utf8))
+        #expect(vector.elements.count == 1)
+        if case .path(let path) = vector.elements[0] {
+            #expect(path.fillGradient != nil)
+            let grad = path.fillGradient!
+            #expect(grad.type == .linear)
+            #expect(grad.startY == 0)
+            #expect(grad.endY == 108)
+            #expect(grad.stops.count == 2)
+            #expect(grad.stops[0].offset == 0)
+            #expect(grad.stops[0].color == "#FFC8C1B8")
+            #expect(grad.stops[1].offset == 1)
+            #expect(grad.stops[1].color == "#FFB2A69A")
+        } else {
+            Issue.record("Expected path element")
+        }
+    }
+
     @Test("Parse dimension units")
     func parseDimensionUnits() throws {
         let units = ["dp", "dip", "sp", "px", "in", "mm", "pt"]

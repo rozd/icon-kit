@@ -3,9 +3,8 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// Renders Android `VectorDrawable` trees to raster images (`CGImage` or PNG `Data`).
+/// Renders an Android `VectorDrawable` into a raster `CGImage` or PNG `Data`.
 public struct VectorDrawableRenderer: Sendable {
-
     public var vector: VectorDrawable
     public var colorResolver: (@Sendable (String) -> CGColor?)?
 
@@ -17,7 +16,7 @@ public struct VectorDrawableRenderer: Sendable {
         self.colorResolver = colorResolver
     }
 
-    /// Render the vector drawable to a `CGImage` of the specified pixel dimensions.
+    /// Render the vector drawable into a `CGImage` of specified dimensions.
     public func renderImage(width: Int, height: Int) throws -> CGImage {
         guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(
@@ -135,8 +134,21 @@ public struct VectorDrawableRenderer: Sendable {
         let cgPath = SVGPathParser.parse(path.pathData)
 
         // Fill
-        if let fillStr = path.fillColor,
-           let baseColor = AndroidColor.parse(fillStr, resolver: colorResolver) {
+        if let gradient = path.fillGradient {
+            context.saveGState()
+            context.addPath(cgPath)
+            if path.fillType == .evenOdd {
+                context.clip(using: .evenOdd)
+            } else {
+                context.clip()
+            }
+            if path.fillAlpha < 1.0 {
+                context.setAlpha(CGFloat(path.fillAlpha))
+            }
+            renderGradient(gradient, in: context)
+            context.restoreGState()
+        } else if let fillStr = path.fillColor,
+                  let baseColor = AndroidColor.parse(fillStr, resolver: colorResolver) {
             let fillColor: CGColor
             if path.fillAlpha < 1.0 {
                 fillColor = baseColor.copy(alpha: baseColor.alpha * CGFloat(path.fillAlpha)) ?? baseColor
@@ -174,6 +186,71 @@ public struct VectorDrawableRenderer: Sendable {
             context.addPath(cgPath)
             context.drawPath(using: .stroke)
             context.restoreGState()
+        }
+    }
+
+    private func renderGradient(_ gradient: VectorGradient, in context: CGContext) {
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return }
+
+        var colors: [CGColor] = []
+        var locations: [CGFloat] = []
+
+        if !gradient.stops.isEmpty {
+            for stop in gradient.stops {
+                if let cgColor = AndroidColor.parse(stop.color, resolver: colorResolver) {
+                    colors.append(cgColor)
+                    locations.append(CGFloat(stop.offset))
+                }
+            }
+        } else if let startStr = gradient.startColor, let endStr = gradient.endColor,
+                  let startColor = AndroidColor.parse(startStr, resolver: colorResolver),
+                  let endColor = AndroidColor.parse(endStr, resolver: colorResolver) {
+            if let centerStr = gradient.centerColor,
+               let centerColor = AndroidColor.parse(centerStr, resolver: colorResolver) {
+                colors = [startColor, centerColor, endColor]
+                locations = [0.0, 0.5, 1.0]
+            } else {
+                colors = [startColor, endColor]
+                locations = [0.0, 1.0]
+            }
+        }
+
+        guard !colors.isEmpty,
+              let cgGradient = CGGradient(
+                  colorsSpace: colorSpace,
+                  colors: colors as CFArray,
+                  locations: locations
+              ) else { return }
+
+        switch gradient.type {
+        case .linear:
+            let startPoint = CGPoint(x: gradient.startX, y: gradient.startY)
+            let endPoint = CGPoint(x: gradient.endX, y: gradient.endY)
+            context.drawLinearGradient(
+                cgGradient,
+                start: startPoint,
+                end: endPoint,
+                options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+            )
+        case .radial:
+            let centerPoint = CGPoint(x: gradient.centerX, y: gradient.centerY)
+            context.drawRadialGradient(
+                cgGradient,
+                startCenter: centerPoint,
+                startRadius: 0,
+                endCenter: centerPoint,
+                endRadius: CGFloat(gradient.gradientRadius),
+                options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+            )
+        case .sweep:
+            let startPoint = CGPoint(x: gradient.startX, y: gradient.startY)
+            let endPoint = CGPoint(x: gradient.endX, y: gradient.endY)
+            context.drawLinearGradient(
+                cgGradient,
+                start: startPoint,
+                end: endPoint,
+                options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+            )
         }
     }
 
