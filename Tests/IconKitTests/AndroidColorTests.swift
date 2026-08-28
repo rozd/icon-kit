@@ -46,18 +46,35 @@ struct AndroidColorTests {
         #expect(components[0] == 1.0)
     }
 
+    @Test("Invalid hex returns nil")
+    func invalidHex() {
+        #expect(AndroidColor.parseHex("invalid") == nil)
+        #expect(AndroidColor.parseHex("#12") == nil)
+        #expect(AndroidColor.parseHex("#12345") == nil)
+        #expect(AndroidColor.parseHex("#1234567") == nil)
+        #expect(AndroidColor.parseHex("#123456789") == nil)
+        #expect(AndroidColor.parseHex("#GGGGGG") == nil)
+    }
+
     @Test("Parse standard Android colors")
     func parseStandardColors() {
-        let transparent = AndroidColor.parse("@android:color/transparent")!
-        #expect(transparent.components![3] == 0)
+        for (name, expectedColor) in AndroidColor.standardColors {
+            let parsed = AndroidColor.parse(name)!
+            #expect(parsed.components == expectedColor.components)
+        }
+    }
 
-        let black = AndroidColor.parse("@android:color/black")!
-        #expect(black.components![0] == 0)
-        #expect(black.components![3] == 1)
+    @Test("Parse with custom resolver")
+    func parseWithCustomResolver() {
+        let customColor = CGColor(srgbRed: 0.1, green: 0.2, blue: 0.3, alpha: 1)
+        let resolved = AndroidColor.parse("@color/custom") { name in
+            if name == "@color/custom" { return customColor }
+            return nil
+        }
+        #expect(resolved == customColor)
 
-        let white = AndroidColor.parse("@android:color/white")!
-        #expect(white.components![0] == 1)
-        #expect(white.components![3] == 1)
+        let unresolved = AndroidColor.parse("@color/missing") { _ in nil }
+        #expect(unresolved == nil)
     }
 
     @Test("Load colors from values directory")

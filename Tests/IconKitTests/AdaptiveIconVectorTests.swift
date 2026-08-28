@@ -117,6 +117,67 @@ struct AdaptiveIconVectorTests {
         #expect(file.legacyIcons["ic_launcher"]?.count == 5)
     }
 
+    @Test("Adaptive icon with vector background")
+    func vectorBackground() throws {
+        let resDir = try makeTempResDir()
+        defer { try? FileManager.default.removeItem(at: resDir) }
+        let fm = FileManager.default
+
+        let anydpiDir = resDir.appendingPathComponent("drawable-anydpi-v26")
+        try fm.createDirectory(at: anydpiDir, withIntermediateDirectories: true)
+        let xml = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+            <background android:drawable="@drawable/ic_launcher_bg"/>
+            <foreground android:drawable="@drawable/ic_launcher_fg"/>
+        </adaptive-icon>
+        """
+        try Data(xml.utf8).write(to: anydpiDir.appendingPathComponent("ic_launcher.xml"))
+
+        let drawableDir = resDir.appendingPathComponent("drawable")
+        try fm.createDirectory(at: drawableDir, withIntermediateDirectories: true)
+        let bgVector = """
+        <vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:width="108dp" android:height="108dp">
+            <path android:fillColor="#00FF00" android:pathData="M0,0h108v108h-108z"/>
+        </vector>
+        """
+        let fgVector = """
+        <vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:width="108dp" android:height="108dp">
+            <path android:fillColor="#FF0000" android:pathData="M10,10h88v88h-88z"/>
+        </vector>
+        """
+        try Data(bgVector.utf8).write(to: drawableDir.appendingPathComponent("ic_launcher_bg.xml"))
+        try Data(fgVector.utf8).write(to: drawableDir.appendingPathComponent("ic_launcher_fg.xml"))
+
+        let file = try AdaptiveIconFile(contentsOf: resDir)
+        #expect(file.foregroundImages.count == 5)
+        #expect(file.backgroundImages.count == 5)
+    }
+
+    @Test("Missing foreground resource throws cannotResolveDrawable")
+    func missingForegroundThrows() throws {
+        let resDir = try makeTempResDir()
+        defer { try? FileManager.default.removeItem(at: resDir) }
+        let fm = FileManager.default
+
+        let anydpiDir = resDir.appendingPathComponent("mipmap-anydpi")
+        try fm.createDirectory(at: anydpiDir, withIntermediateDirectories: true)
+        let xml = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+            <background android:drawable="@color/bg"/>
+            <foreground android:drawable="@drawable/nonexistent"/>
+        </adaptive-icon>
+        """
+        try Data(xml.utf8).write(to: anydpiDir.appendingPathComponent("ic_launcher.xml"))
+
+        #expect(throws: AdaptiveIconError.self) {
+            try AdaptiveIconFile(contentsOf: resDir)
+        }
+    }
+
     @Test("Apply ribbon to modern Android icon and write")
     func applyRibbonAndWrite() throws {
         let resDir = try makeTempResDir()
