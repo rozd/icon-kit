@@ -1,22 +1,26 @@
 import CoreGraphics
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
-/// Facade for reading and writing Android adaptive icon resources.
+/// Represents an Android adaptive icon resource hierarchy inside a `res/` directory.
 ///
-/// An adaptive icon is described by an XML file (typically `ic_launcher.xml`)
-/// inside `res/mipmap-anydpi-v26/` (or `drawable-anydpi-v26/`) that references
-/// drawable or mipmap image assets (Vector Drawable XML, PNG, or WebP)
-/// at various screen densities.
+/// ## Adaptive Icon Structure
 ///
-/// ## Reading
+/// An adaptive icon XML descriptor (typically at `res/mipmap-anydpi-v26/ic_launcher.xml`
+/// and `ic_launcher_round.xml`) references a foreground and background layer:
 ///
-/// The initializer accepts either:
-/// - A direct path to the adaptive icon XML file
-/// - A path to the Android `res/` directory (auto-discovers XML and image/vector assets)
+/// ```xml
+/// <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+///     <background android:drawable="@color/ic_launcher_background" />
+///     <foreground android:drawable="@drawable/ic_launcher_foreground" />
+/// </adaptive-icon>
+/// ```
 ///
-/// Referenced foreground layers can be:
-/// - Android Vector Drawables (`<vector>` in `res/drawable/`)
-/// - Density-qualified bitmap images (PNG or WebP) in `res/mipmap-*/` or `res/drawable-*/`
+/// ## Modern Vector Drawables
+///
+/// In modern Android projects, `@drawable/ic_launcher_foreground` refers to an Android
+/// Vector Drawable XML (`res/drawable/ic_launcher_foreground.xml`) containing `<vector>`.
 ///
 /// When a Vector Drawable foreground is detected, IconKit renders it at all standard
 /// Android adaptive icon densities (mdpi: 108px, hdpi: 162px, xhdpi: 216px, xxhdpi: 324px, xxxhdpi: 432px).
@@ -90,6 +94,9 @@ public struct AdaptiveIconFile: Sendable {
     /// Whether the foreground layer was loaded from a Vector Drawable XML.
     public var isForegroundVector: Bool
 
+    /// Whether the background layer was loaded from a Vector Drawable XML.
+    public var isBackgroundVector: Bool
+
     /// Relative paths to Vector Drawable XML files that were rasterized.
     public var vectorRelativePaths: [String]
 
@@ -110,6 +117,7 @@ public struct AdaptiveIconFile: Sendable {
         foregroundExtensions: [String: String] = [:],
         backgroundExtensions: [String: String] = [:],
         isForegroundVector: Bool = false,
+        isBackgroundVector: Bool = false,
         vectorRelativePaths: [String] = [],
         additionalXMLFiles: [String: Data] = [:],
         legacyIcons: [String: [String: Data]] = [:],
@@ -124,6 +132,7 @@ public struct AdaptiveIconFile: Sendable {
         self.foregroundExtensions = foregroundExtensions
         self.backgroundExtensions = backgroundExtensions
         self.isForegroundVector = isForegroundVector
+        self.isBackgroundVector = isBackgroundVector
         self.vectorRelativePaths = vectorRelativePaths
         self.additionalXMLFiles = additionalXMLFiles
         self.legacyIcons = legacyIcons
@@ -201,6 +210,7 @@ public struct AdaptiveIconFile: Sendable {
         self.foregroundExtensions = [:]
         self.backgroundExtensions = [:]
         self.isForegroundVector = false
+        self.isBackgroundVector = false
         self.vectorRelativePaths = []
         self.legacyIcons = [:]
         self.legacyExtensions = [:]
@@ -227,6 +237,7 @@ public struct AdaptiveIconFile: Sendable {
             ) {
                 self.backgroundImages = resolved.images
                 self.backgroundExtensions = resolved.extensions
+                self.isBackgroundVector = resolved.isVector
             }
         }
 
@@ -289,9 +300,11 @@ public struct AdaptiveIconFile: Sendable {
             }
         }
 
-        // 5. Write Background images
+        // 5. Write Background images ONLY IF background is bitmap assets (not vector or color)
         if let ref = descriptor.background,
-           let parsed = AdaptiveIcon.parseDrawableReference(ref) {
+           let parsed = AdaptiveIcon.parseDrawableReference(ref),
+           !backgroundImages.isEmpty,
+           !isBackgroundVector {
             for (dirName, data) in backgroundImages {
                 let dir = resDir.appendingPathComponent(dirName)
                 try fm.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -351,37 +364,41 @@ public struct AdaptiveIconFile: Sendable {
         return results
     }
 
+    /// Collect icon base names to search for legacy launcher bitmaps.
     private static func collectLegacyIconNames(from xmlURLs: [URL]) -> [String] {
-        var names: Set<String> = ["ic_launcher", "ic_launcher_round"]
+        var names: [String] = []
         for url in xmlURLs {
-            let name = url.deletingPathExtension().lastPathComponent
-            names.insert(name)
+            let baseName = url.deletingPathExtension().lastPathComponent
+            if !names.contains(baseName) {
+                names.append(baseName)
+            }
         }
-        return Array(names).sorted()
+        if names.isEmpty {
+            names = ["ic_launcher", "ic_launcher_round"]
+        }
+        return names
     }
 
-    // MARK: - Resolution
-
-    private struct ResolvedForeground {
-        var images: [String: Data]
-        var extensions: [String: String]
-        var isVector: Bool
-        var vectorRelativePaths: [String]
-    }
+    // MARK: - Resolution Helpers
 
     private static func resolveForeground(
         drawableRef: String,
         in resDir: URL,
         colorResolver: (@Sendable (String) -> CGColor?)?
-    ) throws -> ResolvedForeground {
+    ) throws -> (
+        images: [String: Data],
+        extensions: [String: String],
+        isVector: Bool,
+        vectorRelativePaths: [String]
+    ) {
         guard let parsed = AdaptiveIcon.parseDrawableReference(drawableRef) else {
             throw AdaptiveIconError.cannotResolveDrawable(drawableRef)
         }
 
-        // 1. Try resolving bitmap images across density directories
+        // 1. Check for bitmap assets (PNG/WebP) across density folders
         let bitmapResolved = try resolveBitmapImages(type: parsed.type, name: parsed.name, in: resDir)
         if !bitmapResolved.images.isEmpty {
-            return ResolvedForeground(
+            return (
                 images: bitmapResolved.images,
                 extensions: bitmapResolved.extensions,
                 isVector: false,
@@ -389,7 +406,7 @@ public struct AdaptiveIconFile: Sendable {
             )
         }
 
-        // 2. Try resolving Vector Drawable XML
+        // 2. Check for Vector Drawable XML in drawable/ or drawable-*/ folders
         if let vectorFile = findVectorDrawableXML(type: parsed.type, name: parsed.name, in: resDir) {
             let xmlData = try Data(contentsOf: vectorFile)
             let vector = try VectorDrawable(xmlData: xmlData)
@@ -398,8 +415,7 @@ public struct AdaptiveIconFile: Sendable {
             var images: [String: Data] = [:]
             var extensions: [String: String] = [:]
 
-            let folderPrefix = parsed.type // "drawable" or "mipmap"
-
+            let folderPrefix = parsed.type // e.g. "drawable" or "mipmap"
             for density in standardDensities {
                 let dirName = "\(folderPrefix)-\(density.suffix)"
                 let pngData = try renderer.renderPNG(
@@ -414,7 +430,7 @@ public struct AdaptiveIconFile: Sendable {
             let vectorComponents = vectorFile.standardizedFileURL.pathComponents
             let relPath = vectorComponents.dropFirst(resComponents.count).joined(separator: "/")
 
-            return ResolvedForeground(
+            return (
                 images: images,
                 extensions: extensions,
                 isVector: true,
@@ -431,15 +447,15 @@ public struct AdaptiveIconFile: Sendable {
         drawableRef: String,
         in resDir: URL,
         colorResolver: (@Sendable (String) -> CGColor?)?
-    ) throws -> (images: [String: Data], extensions: [String: String]) {
+    ) throws -> (images: [String: Data], extensions: [String: String], isVector: Bool) {
         guard let parsed = AdaptiveIcon.parseDrawableReference(drawableRef) else {
-            return ([:], [:])
+            return ([:], [:], false)
         }
 
         // Try resolving bitmap images
         let bitmapResolved = try resolveBitmapImages(type: parsed.type, name: parsed.name, in: resDir)
         if !bitmapResolved.images.isEmpty {
-            return (bitmapResolved.images, bitmapResolved.extensions)
+            return (bitmapResolved.images, bitmapResolved.extensions, false)
         }
 
         // Try resolving vector XML
@@ -460,11 +476,11 @@ public struct AdaptiveIconFile: Sendable {
                         extensions[dirName] = "png"
                     }
                 }
-                return (images, extensions)
+                return (images, extensions, true)
             }
         }
 
-        return ([:], [:])
+        return ([:], [:], false)
     }
 
     private static func resolveLegacyIcons(

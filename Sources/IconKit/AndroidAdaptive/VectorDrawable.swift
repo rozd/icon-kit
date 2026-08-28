@@ -15,8 +15,8 @@ public struct VectorDrawable: Sendable {
     public init(
         width: Double = 108,
         height: Double = 108,
-        viewportWidth: Double = 108,
-        viewportHeight: Double = 108,
+        viewportWidth: Double? = nil,
+        viewportHeight: Double? = nil,
         alpha: Double = 1.0,
         tint: String? = nil,
         tintMode: String? = nil,
@@ -24,8 +24,8 @@ public struct VectorDrawable: Sendable {
     ) {
         self.width = width
         self.height = height
-        self.viewportWidth = viewportWidth
-        self.viewportHeight = viewportHeight
+        self.viewportWidth = viewportWidth ?? width
+        self.viewportHeight = viewportHeight ?? height
         self.alpha = alpha
         self.tint = tint
         self.tintMode = tintMode
@@ -81,6 +81,66 @@ public struct VectorGroup: Sendable {
     }
 }
 
+/// A gradient specification in a VectorDrawable.
+public struct VectorGradient: Sendable, Equatable {
+    public enum GradientType: String, Sendable {
+        case linear
+        case radial
+        case sweep
+    }
+
+    public struct Stop: Sendable, Equatable {
+        public var offset: Double
+        public var color: String
+
+        public init(offset: Double, color: String) {
+            self.offset = offset
+            self.color = color
+        }
+    }
+
+    public var type: GradientType
+    public var startX: Double
+    public var startY: Double
+    public var endX: Double
+    public var endY: Double
+    public var centerX: Double
+    public var centerY: Double
+    public var gradientRadius: Double
+    public var startColor: String?
+    public var endColor: String?
+    public var centerColor: String?
+    public var stops: [Stop]
+
+    public init(
+        type: GradientType = .linear,
+        startX: Double = 0,
+        startY: Double = 0,
+        endX: Double = 0,
+        endY: Double = 0,
+        centerX: Double = 0,
+        centerY: Double = 0,
+        gradientRadius: Double = 0,
+        startColor: String? = nil,
+        endColor: String? = nil,
+        centerColor: String? = nil,
+        stops: [Stop] = []
+    ) {
+        self.type = type
+        self.startX = startX
+        self.startY = startY
+        self.endX = endX
+        self.endY = endY
+        self.centerX = centerX
+        self.centerY = centerY
+        self.gradientRadius = gradientRadius
+        self.startColor = startColor
+        self.endColor = endColor
+        self.centerColor = centerColor
+        self.stops = stops
+    }
+}
+
 /// A `<path>` element in a VectorDrawable.
 public struct VectorPath: Sendable {
     public enum FillType: Sendable {
@@ -91,6 +151,7 @@ public struct VectorPath: Sendable {
     public var name: String?
     public var pathData: String
     public var fillColor: String?
+    public var fillGradient: VectorGradient?
     public var fillAlpha: Double
     public var fillType: FillType
     public var strokeColor: String?
@@ -107,6 +168,7 @@ public struct VectorPath: Sendable {
         name: String? = nil,
         pathData: String = "",
         fillColor: String? = nil,
+        fillGradient: VectorGradient? = nil,
         fillAlpha: Double = 1.0,
         fillType: FillType = .nonZero,
         strokeColor: String? = nil,
@@ -122,6 +184,7 @@ public struct VectorPath: Sendable {
         self.name = name
         self.pathData = pathData
         self.fillColor = fillColor
+        self.fillGradient = fillGradient
         self.fillAlpha = fillAlpha
         self.fillType = fillType
         self.strokeColor = strokeColor
@@ -153,6 +216,9 @@ private final class VectorDrawableXMLParser: NSObject, XMLParserDelegate {
     private var rootDrawable: VectorDrawable?
     private var groupStack: [VectorGroup] = []
     private var rootElements: [VectorElement] = []
+    private var currentPath: VectorPath?
+    private var currentGradient: VectorGradient?
+    private var isInsideFillColorAttr: Bool = false
     private var parseError: Error?
 
     func parse(data: Data) throws -> VectorDrawable {
@@ -213,7 +279,7 @@ private final class VectorDrawableXMLParser: NSObject, XMLParserDelegate {
             groupStack.append(group)
 
         case "path":
-            let path = VectorPath(
+            currentPath = VectorPath(
                 name: attributes["android:name"],
                 pathData: attributes["android:pathData"] ?? "",
                 fillColor: attributes["android:fillColor"],
@@ -229,7 +295,43 @@ private final class VectorDrawableXMLParser: NSObject, XMLParserDelegate {
                 trimPathEnd: Double(attributes["android:trimPathEnd"] ?? "") ?? 1,
                 trimPathOffset: Double(attributes["android:trimPathOffset"] ?? "") ?? 0
             )
-            addElement(.path(path))
+
+        case "aapt:attr":
+            if attributes["name"] == "android:fillColor" {
+                isInsideFillColorAttr = true
+            }
+
+        case "gradient":
+            let typeStr = attributes["android:type"] ?? "linear"
+            let type: VectorGradient.GradientType
+            switch typeStr {
+            case "radial": type = .radial
+            case "sweep": type = .sweep
+            default: type = .linear
+            }
+
+            currentGradient = VectorGradient(
+                type: type,
+                startX: Double(attributes["android:startX"] ?? "") ?? 0,
+                startY: Double(attributes["android:startY"] ?? "") ?? 0,
+                endX: Double(attributes["android:endX"] ?? "") ?? 0,
+                endY: Double(attributes["android:endY"] ?? "") ?? 0,
+                centerX: Double(attributes["android:centerX"] ?? "") ?? 0,
+                centerY: Double(attributes["android:centerY"] ?? "") ?? 0,
+                gradientRadius: Double(attributes["android:gradientRadius"] ?? "") ?? 0,
+                startColor: attributes["android:startColor"],
+                endColor: attributes["android:endColor"],
+                centerColor: attributes["android:centerColor"],
+                stops: []
+            )
+
+        case "item":
+            if var grad = currentGradient,
+               let color = attributes["android:color"] {
+                let offset = Double(attributes["android:offset"] ?? "") ?? 0
+                grad.stops.append(VectorGradient.Stop(offset: offset, color: color))
+                currentGradient = grad
+            }
 
         case "clip-path":
             let clip = VectorClipPath(
@@ -249,9 +351,26 @@ private final class VectorDrawableXMLParser: NSObject, XMLParserDelegate {
         namespaceURI: String?,
         qualifiedName: String?
     ) {
-        if elementName == "group", !groupStack.isEmpty {
-            let finishedGroup = groupStack.removeLast()
-            addElement(.group(finishedGroup))
+        switch elementName {
+        case "group":
+            if !groupStack.isEmpty {
+                let finishedGroup = groupStack.removeLast()
+                addElement(.group(finishedGroup))
+            }
+        case "gradient":
+            if isInsideFillColorAttr || currentPath != nil {
+                currentPath?.fillGradient = currentGradient
+                currentGradient = nil
+            }
+        case "aapt:attr":
+            isInsideFillColorAttr = false
+        case "path":
+            if let path = currentPath {
+                addElement(.path(path))
+                currentPath = nil
+            }
+        default:
+            break
         }
     }
 

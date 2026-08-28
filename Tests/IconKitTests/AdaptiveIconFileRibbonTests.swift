@@ -121,8 +121,8 @@ struct AdaptiveIconFileRibbonTests {
         try file.applyRibbon(placement: .bottom, style: style)
 
         let image = decodeImage(file.foregroundImages["mipmap-xxhdpi"]!)
-        // Bottom area should have red ribbon pixels
-        let bottomPixel = samplePixel(image, x: 162, y: 320)
+        // Safe-zone bottom area (within 72dp viewport) should have red ribbon pixels
+        let bottomPixel = samplePixel(image, x: 162, y: 240)
         #expect(bottomPixel.r > 0.8)
         #expect(bottomPixel.a > 0.9)
     }

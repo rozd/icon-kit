@@ -45,7 +45,7 @@ struct AdaptiveIconVectorTests {
         let adaptiveXML = """
         <?xml version="1.0" encoding="utf-8"?>
         <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-            <background android:drawable="@color/ic_launcher_background"/>
+            <background android:drawable="@drawable/ic_launcher_background"/>
             <foreground android:drawable="@drawable/ic_launcher_foreground"/>
             <monochrome android:drawable="@drawable/ic_launcher_foreground"/>
         </adaptive-icon>
@@ -53,11 +53,37 @@ struct AdaptiveIconVectorTests {
         try Data(adaptiveXML.utf8).write(to: anydpiDir.appendingPathComponent("ic_launcher.xml"))
         try Data(adaptiveXML.utf8).write(to: anydpiDir.appendingPathComponent("ic_launcher_round.xml"))
 
-        // 2. drawable/ic_launcher_foreground.xml (Vector Drawable)
+        // 2. drawable/ic_launcher_background.xml (Gradient Vector Drawable)
         let drawableDir = resDir.appendingPathComponent("drawable")
         try fm.createDirectory(at: drawableDir, withIntermediateDirectories: true)
 
-        let vectorXML = """
+        let bgVectorXML = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <vector xmlns:android="http://schemas.android.com/apk/res/android"
+                xmlns:aapt="http://schemas.android.com/aapt"
+                android:width="108dp"
+                android:height="108dp"
+                android:viewportWidth="108"
+                android:viewportHeight="108">
+            <path android:pathData="M0,0h108v108h-108z">
+                <aapt:attr name="android:fillColor">
+                    <gradient
+                            android:startY="0"
+                            android:startX="54"
+                            android:endY="108"
+                            android:endX="54"
+                            android:type="linear">
+                        <item android:offset="0" android:color="#FFC8C1B8"/>
+                        <item android:offset="1" android:color="#FFB2A69A"/>
+                    </gradient>
+                </aapt:attr>
+            </path>
+        </vector>
+        """
+        try Data(bgVectorXML.utf8).write(to: drawableDir.appendingPathComponent("ic_launcher_background.xml"))
+
+        // 3. drawable/ic_launcher_foreground.xml (Vector Drawable)
+        let fgVectorXML = """
         <vector xmlns:android="http://schemas.android.com/apk/res/android"
             android:width="108dp"
             android:height="108dp"
@@ -68,19 +94,7 @@ struct AdaptiveIconVectorTests {
                 android:pathData="M10,10h88v88h-88z"/>
         </vector>
         """
-        try Data(vectorXML.utf8).write(to: drawableDir.appendingPathComponent("ic_launcher_foreground.xml"))
-
-        // 3. values/ic_launcher_background.xml
-        let valuesDir = resDir.appendingPathComponent("values")
-        try fm.createDirectory(at: valuesDir, withIntermediateDirectories: true)
-
-        let valuesXML = """
-        <?xml version="1.0" encoding="utf-8"?>
-        <resources>
-            <color name="ic_launcher_background">#B2A69A</color>
-        </resources>
-        """
-        try Data(valuesXML.utf8).write(to: valuesDir.appendingPathComponent("ic_launcher_background.xml"))
+        try Data(fgVectorXML.utf8).write(to: drawableDir.appendingPathComponent("ic_launcher_foreground.xml"))
 
         // 4. Legacy mipmap densities
         for (suffix, _, _, legacySize) in AdaptiveIconFile.standardDensities {
@@ -101,9 +115,9 @@ struct AdaptiveIconVectorTests {
         let file = try AdaptiveIconFile(contentsOf: resDir)
         #expect(file.isForegroundVector == true)
         #expect(file.descriptor.foreground == "@drawable/ic_launcher_foreground")
-        #expect(file.descriptor.background == "@color/ic_launcher_background")
+        #expect(file.descriptor.background == "@drawable/ic_launcher_background")
 
-        // Should have rendered all 5 standard densities
+        // Should have rendered all 5 standard densities for foreground
         #expect(file.foregroundImages.count == 5)
         #expect(file.foregroundImages["drawable-mdpi"] != nil)
         #expect(file.foregroundImages["drawable-hdpi"] != nil)
@@ -200,7 +214,7 @@ struct AdaptiveIconVectorTests {
         #expect(fm.fileExists(atPath: outputDir.appendingPathComponent("mipmap-anydpi-v26/ic_launcher.xml").path))
         #expect(fm.fileExists(atPath: outputDir.appendingPathComponent("mipmap-anydpi-v26/ic_launcher_round.xml").path))
 
-        // Vector XML should NOT exist in output (cleaned up so AAPT uses density PNGs)
+        // Foreground Vector XML should NOT exist in output (cleaned up so AAPT uses density PNGs)
         #expect(!fm.fileExists(atPath: outputDir.appendingPathComponent("drawable/ic_launcher_foreground.xml").path))
 
         // Density PNGs should exist for foreground
@@ -231,10 +245,13 @@ struct AdaptiveIconVectorTests {
 
         let fm = FileManager.default
 
-        // Original vector XML was removed
+        // Original foreground vector XML was removed
         #expect(!fm.fileExists(atPath: resDir.appendingPathComponent("drawable/ic_launcher_foreground.xml").path))
 
-        // Density PNGs are present
+        // Background vector XML was preserved!
+        #expect(fm.fileExists(atPath: resDir.appendingPathComponent("drawable/ic_launcher_background.xml").path))
+
+        // Density PNGs are present for foreground
         #expect(fm.fileExists(atPath: resDir.appendingPathComponent("drawable-xxxhdpi/ic_launcher_foreground.png").path))
 
         // Rereading should succeed cleanly from the modified directory

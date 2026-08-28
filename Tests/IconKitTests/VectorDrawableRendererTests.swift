@@ -22,7 +22,6 @@ struct VectorDrawableRendererTests {
         )!
         context.draw(image, in: CGRect(x: -x, y: -(image.height - 1 - y), width: image.width, height: image.height))
         let a = CGFloat(pixel[3]) / 255.0
-        // Un-premultiply RGB if alpha > 0
         let r = a > 0 ? (CGFloat(pixel[0]) / 255.0) / a : 0
         let g = a > 0 ? (CGFloat(pixel[1]) / 255.0) / a : 0
         let b = a > 0 ? (CGFloat(pixel[2]) / 255.0) / a : 0
@@ -55,6 +54,41 @@ struct VectorDrawableRendererTests {
         #expect(center.a > 0.9)
     }
 
+    @Test("Render vector with linear gradient")
+    func renderLinearGradient() throws {
+        let gradient = VectorGradient(
+            type: .linear,
+            startX: 0,
+            startY: 0,
+            endX: 100,
+            endY: 0,
+            stops: [
+                .init(offset: 0, color: "#FF0000"), // Red at left
+                .init(offset: 1, color: "#0000FF"), // Blue at right
+            ]
+        )
+        let path = VectorPath(
+            pathData: "M0,0h100v100h-100z",
+            fillGradient: gradient
+        )
+        let vector = VectorDrawable(
+            width: 100,
+            height: 100,
+            elements: [.path(path)]
+        )
+        let renderer = VectorDrawableRenderer(vector: vector)
+        let pngData = try renderer.renderPNG(width: 100, height: 100)
+        let image = decodeImage(pngData)
+
+        let left = samplePixel(image, x: 5, y: 50)
+        #expect(left.r > 0.8)
+        #expect(left.b < 0.2)
+
+        let right = samplePixel(image, x: 95, y: 50)
+        #expect(right.b > 0.8)
+        #expect(right.r < 0.2)
+    }
+
     @Test("Render vector with group transformation and rotation")
     func renderWithGroup() throws {
         let path = VectorPath(
@@ -82,7 +116,7 @@ struct VectorDrawableRendererTests {
         let pngData = try renderer.renderPNG(width: 100, height: 100)
         let image = decodeImage(pngData)
 
-        // Center of transformed group (around 45, 45) should be green
+        // Center of transformed group should be green
         let center = samplePixel(image, x: 45, y: 45)
         #expect(center.g > 0.9)
         #expect(center.a > 0.9)
@@ -118,7 +152,6 @@ struct VectorDrawableRendererTests {
 
     @Test("Render vector with fillAlpha and evenOdd fillType")
     func renderFillAlphaAndEvenOdd() throws {
-        // Two concentric squares with even-odd fill -> donut hole in center
         let path = VectorPath(
             pathData: "M0,0 h100 v100 h-100 z M25,25 h50 v50 h-50 z",
             fillColor: "#FF0000",
@@ -134,12 +167,10 @@ struct VectorDrawableRendererTests {
         let pngData = try renderer.renderPNG(width: 100, height: 100)
         let image = decodeImage(pngData)
 
-        // Outer area should have alpha ~0.5 and red color ~1.0
         let outer = samplePixel(image, x: 10, y: 10)
         #expect(outer.r > 0.9)
         #expect(outer.a > 0.4 && outer.a < 0.6)
 
-        // Inner hole should be transparent due to evenOdd fill
         let inner = samplePixel(image, x: 50, y: 50)
         #expect(inner.a < 0.1)
     }
@@ -161,12 +192,10 @@ struct VectorDrawableRendererTests {
         let pngData = try renderer.renderPNG(width: 100, height: 100)
         let image = decodeImage(pngData)
 
-        // Left half (clipped in) is blue
         let left = samplePixel(image, x: 25, y: 50)
         #expect(left.b > 0.9)
         #expect(left.a > 0.9)
 
-        // Right half (clipped out) is transparent
         let right = samplePixel(image, x: 75, y: 50)
         #expect(right.a < 0.1)
     }
