@@ -89,6 +89,129 @@ struct VectorDrawableRendererTests {
         #expect(right.r < 0.2)
     }
 
+    @Test("Render vector with radial gradient")
+    func renderRadialGradient() throws {
+        let gradient = VectorGradient(
+            type: .radial,
+            centerX: 50,
+            centerY: 50,
+            gradientRadius: 50,
+            stops: [
+                .init(offset: 0, color: "#FF0000"), // Red at center
+                .init(offset: 1, color: "#00FF00"), // Green at edge
+            ]
+        )
+        let path = VectorPath(
+            pathData: "M0,0h100v100h-100z",
+            fillGradient: gradient
+        )
+        let vector = VectorDrawable(
+            width: 100,
+            height: 100,
+            elements: [.path(path)]
+        )
+        let renderer = VectorDrawableRenderer(vector: vector)
+        let pngData = try renderer.renderPNG(width: 100, height: 100)
+        let image = decodeImage(pngData)
+
+        let center = samplePixel(image, x: 50, y: 50)
+        #expect(center.r > 0.8)
+        #expect(center.g < 0.2)
+
+        let edge = samplePixel(image, x: 98, y: 50)
+        #expect(edge.g > 0.8)
+    }
+
+    @Test("Render vector with sweep gradient")
+    func renderSweepGradient() throws {
+        let gradient = VectorGradient(
+            type: .sweep,
+            startX: 0,
+            startY: 0,
+            endX: 100,
+            endY: 0,
+            stops: [
+                .init(offset: 0, color: "#FF0000"),
+                .init(offset: 1, color: "#0000FF"),
+            ]
+        )
+        let path = VectorPath(
+            pathData: "M0,0h100v100h-100z",
+            fillGradient: gradient
+        )
+        let vector = VectorDrawable(
+            width: 100,
+            height: 100,
+            elements: [.path(path)]
+        )
+        let renderer = VectorDrawableRenderer(vector: vector)
+        let pngData = try renderer.renderPNG(width: 100, height: 100)
+        let image = decodeImage(pngData)
+        #expect(image.width == 100)
+    }
+
+    @Test("Render vector with 3-color gradient (start, center, end)")
+    func renderThreeColorGradient() throws {
+        let gradient = VectorGradient(
+            type: .linear,
+            startX: 0,
+            startY: 0,
+            endX: 100,
+            endY: 0,
+            startColor: "#FF0000",
+            endColor: "#0000FF",
+            centerColor: "#00FF00"
+        )
+        let path = VectorPath(
+            pathData: "M0,0h100v100h-100z",
+            fillGradient: gradient
+        )
+        let vector = VectorDrawable(
+            width: 100,
+            height: 100,
+            elements: [.path(path)]
+        )
+        let renderer = VectorDrawableRenderer(vector: vector)
+        let pngData = try renderer.renderPNG(width: 100, height: 100)
+        let image = decodeImage(pngData)
+
+        let center = samplePixel(image, x: 50, y: 50)
+        #expect(center.g > 0.8)
+    }
+
+    @Test("Render vector with gradient fillAlpha and evenOdd")
+    func renderGradientWithFillAlpha() throws {
+        let gradient = VectorGradient(
+            type: .linear,
+            startX: 0,
+            startY: 0,
+            endX: 100,
+            endY: 0,
+            startColor: "#FF0000",
+            endColor: "#0000FF"
+        )
+        let path = VectorPath(
+            pathData: "M0,0h100v100h-100z M25,25h50v50h-50z",
+            fillGradient: gradient,
+            fillAlpha: 0.5,
+            fillType: .evenOdd
+        )
+        let vector = VectorDrawable(
+            width: 100,
+            height: 100,
+            elements: [.path(path)]
+        )
+        let renderer = VectorDrawableRenderer(vector: vector)
+        let pngData = try renderer.renderPNG(width: 100, height: 100)
+        let image = decodeImage(pngData)
+
+        let outer = samplePixel(image, x: 10, y: 10)
+        #expect(outer.a > 0.4 && outer.a < 0.6)
+
+        let hole = samplePixel(image, x: 50, y: 50)
+        #expect(hole.a < 0.1)
+    }
+
     @Test("Render vector with group transformation and rotation")
     func renderWithGroup() throws {
         let path = VectorPath(
@@ -148,6 +271,27 @@ struct VectorDrawableRendererTests {
         let mid = samplePixel(image, x: 50, y: 50)
         #expect(mid.b > 0.9)
         #expect(mid.a > 0.7 && mid.a < 0.9)
+    }
+
+    @Test("Render vector with full-opacity stroke (no strokeAlpha)")
+    func renderOpaqueStroke() throws {
+        let path = VectorPath(
+            pathData: "M10,50 L90,50",
+            strokeColor: "#0000FF",
+            strokeWidth: 10
+        )
+        let vector = VectorDrawable(
+            width: 100,
+            height: 100,
+            elements: [.path(path)]
+        )
+        let renderer = VectorDrawableRenderer(vector: vector)
+        let pngData = try renderer.renderPNG(width: 100, height: 100)
+        let image = decodeImage(pngData)
+
+        let mid = samplePixel(image, x: 50, y: 50)
+        #expect(mid.b > 0.9)
+        #expect(mid.a > 0.9)
     }
 
     @Test("Render vector with fillAlpha and evenOdd fillType")

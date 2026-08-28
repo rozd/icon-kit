@@ -288,4 +288,60 @@ struct RibbonRendererTests {
         #expect(descriptor.document.fill == .automatic)
         #expect(descriptor.document.supportedPlatforms?.circles == ["watchOS"])
     }
+
+    // MARK: - Viewport insets (Safe-Zone)
+
+    @Test("Viewport parameter positions bottom ribbon within safe zone")
+    func bottomRibbonWithViewport() throws {
+        let bgColor = CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1)
+        let style = RibbonStyle(text: "DEV", size: 0.25, background: bgColor)
+        let renderer = RibbonRenderer(placement: .bottom, style: style)
+
+        // 1080x1080 canvas, viewport centered 720x720 (180px margins)
+        let viewport = CGRect(x: 180, y: 180, width: 720, height: 720)
+        let output = try renderer.generateOverlay(width: 1080, height: 1080, viewport: viewport)
+        let image = decodeImage(output)
+
+        // Outer margin below viewport (e.g. y = 1000 in top-down, which is y = 80 in CG) should be transparent
+        let outerBottom = samplePixel(image, x: 540, y: 1000)
+        #expect(outerBottom.a < 0.01)
+
+        // Inside viewport bottom (y = 1080 - 180 - 90 = 810 in top-down) should be red ribbon
+        let innerBottom = samplePixel(image, x: 540, y: 810)
+        #expect(innerBottom.r > 0.8)
+        #expect(innerBottom.a > 0.9)
+    }
+
+    @Test("Viewport parameter positions top ribbon within safe zone")
+    func topRibbonWithViewport() throws {
+        let bgColor = CGColor(srgbRed: 0, green: 0, blue: 1, alpha: 1)
+        let style = RibbonStyle(text: "DEV", size: 0.25, background: bgColor)
+        let renderer = RibbonRenderer(placement: .top, style: style)
+
+        let viewport = CGRect(x: 180, y: 180, width: 720, height: 720)
+        let output = try renderer.generateOverlay(width: 1080, height: 1080, viewport: viewport)
+        let image = decodeImage(output)
+
+        // Top margin above viewport (y = 50 in top-down) should be transparent
+        let outerTop = samplePixel(image, x: 540, y: 50)
+        #expect(outerTop.a < 0.01)
+
+        // Inside viewport top (y = 180 + 90 = 270 in top-down) should be blue ribbon
+        let innerTop = samplePixel(image, x: 540, y: 270)
+        #expect(innerTop.b > 0.8)
+        #expect(innerTop.a > 0.9)
+    }
+
+    @Test("Viewport parameter positions diagonal ribbon within safe zone")
+    func diagonalRibbonWithViewport() throws {
+        let bgColor = CGColor(srgbRed: 0, green: 1, blue: 0, alpha: 1)
+        let style = RibbonStyle(text: "DEV", size: 0.25, background: bgColor)
+        let renderer = RibbonRenderer(placement: .topRight, style: style)
+
+        let viewport = CGRect(x: 180, y: 180, width: 720, height: 720)
+        let output = try renderer.generateOverlay(width: 1080, height: 1080, viewport: viewport)
+        let image = decodeImage(output)
+        #expect(image.width == 1080)
+        #expect(image.height == 1080)
+    }
 }
