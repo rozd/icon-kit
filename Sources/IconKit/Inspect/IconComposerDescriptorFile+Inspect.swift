@@ -85,6 +85,9 @@ private func formatGroup(_ group: IconGroup, indent: String) -> [String] {
     if let blendMode = group.blendMode, blendMode != .normal {
         lines.append("\(indent)Blend mode: \(blendMode.rawValue)")
     }
+    if let position = group.position, !isIdentity(position) {
+        lines.append("\(indent)Position: \(formatPosition(position))")
+    }
 
     // Layers
     for (index, layer) in group.layers.enumerated() {

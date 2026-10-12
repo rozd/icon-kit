@@ -247,6 +247,29 @@ struct InspectTests {
         #expect(output.contains("Position: scale 2.0, translate (10.0, 20.0)"))
     }
 
+    @Test("Suppresses identity group position")
+    func suppressesIdentityGroupPosition() {
+        let doc = IconDocument(groups: [
+            IconGroup(layers: [], position: .identity),
+        ])
+        let file = IconComposerDescriptorFile(document: doc)
+        let output = file.inspectSummary(bundleName: "Test.icon")
+
+        #expect(!output.contains("Position"))
+    }
+
+    @Test("Shows non-identity group position")
+    func showsNonIdentityGroupPosition() {
+        let pos = IconPosition(scale: 1.2, translationInPoints: [0, 12])
+        let doc = IconDocument(groups: [
+            IconGroup(layers: [], position: pos),
+        ])
+        let file = IconComposerDescriptorFile(document: doc)
+        let output = file.inspectSummary(bundleName: "Test.icon")
+
+        #expect(output.contains("Position: scale 1.2, translate (0.0, 12.0)"))
+    }
+
     // MARK: - Layer Properties
 
     @Test("Shows glass true")
