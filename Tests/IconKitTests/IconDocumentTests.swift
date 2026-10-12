@@ -75,6 +75,31 @@ struct IconDocumentTests {
         #expect(layer.opacity == 1.0)
     }
 
+    @Test("Group position survives decode and encode")
+    func groupPosition() throws {
+        let json = Data("""
+        {
+            "groups": [
+                {
+                    "layers": [],
+                    "position": {
+                        "scale": 1.2,
+                        "translation-in-points": [0, 12]
+                    }
+                }
+            ]
+        }
+        """.utf8)
+
+        let doc = try JSONDecoder().decode(IconDocument.self, from: json)
+        let position = try #require(doc.groups.first?.position)
+        #expect(position.scale == 1.2)
+        #expect(position.translationInPoints == [0, 12])
+
+        let roundTripped = try JSONDecoder().decode(IconDocument.self, from: JSONEncoder().encode(doc))
+        #expect(roundTripped.groups.first?.position == position)
+    }
+
     @Test("Document round-trip preserves all fields")
     func roundTrip() throws {
         let doc = IconDocument(

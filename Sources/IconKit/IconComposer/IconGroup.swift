@@ -38,6 +38,9 @@ public struct IconGroup: Codable, Hashable, Sendable {
     /// Base blend mode.
     public var blendMode: IconBlendMode?
 
+    /// Base position and scale transform, applied to all layers in the group.
+    public var position: IconPosition?
+
     // MARK: - Specializations
 
     public var hiddenSpecializations: [Specialization<Bool>]?
@@ -60,6 +63,7 @@ public struct IconGroup: Codable, Hashable, Sendable {
         lighting: IconLighting? = nil,
         specular: Bool? = nil,
         blendMode: IconBlendMode? = nil,
+        position: IconPosition? = nil,
         hiddenSpecializations: [Specialization<Bool>]? = nil,
         shadowSpecializations: [Specialization<IconShadow>]? = nil,
         translucencySpecializations: [Specialization<IconTranslucency>]? = nil,
@@ -79,6 +83,7 @@ public struct IconGroup: Codable, Hashable, Sendable {
         self.lighting = lighting
         self.specular = specular
         self.blendMode = blendMode
+        self.position = position
         self.hiddenSpecializations = hiddenSpecializations
         self.shadowSpecializations = shadowSpecializations
         self.translucencySpecializations = translucencySpecializations
@@ -89,7 +94,7 @@ public struct IconGroup: Codable, Hashable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, layers, hidden, shadow, translucency, opacity, lighting, specular
+        case id, name, layers, hidden, shadow, translucency, opacity, lighting, specular, position
         case blurMaterial = "blur-material"
         case blendMode = "blend-mode"
         case hiddenSpecializations = "hidden-specializations"
